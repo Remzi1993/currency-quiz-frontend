@@ -3,12 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b && tsc -p tsconfig.test.json",
+    "test": "node --test src/api/client.test.ts src/composables/useQuiz.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "bulma": "^1.0.4",
+    "openapi-fetch": "^0.17.0",
     "vue": "^3.5.44"
   },
   "devDependencies": {

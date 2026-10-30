@@ -56,7 +56,7 @@ const repositories = [
     <div class="footer-details">
       <section class="footer-about" aria-labelledby="about-heading">
         <p class="eyebrow">BEHIND THE PROJECT</p>
-        <h3 id="about-heading">Hi, I’m Remzi Çavdar.</h3>
+        <h3 id="about-heading">Hi, I’m Remzi Çavdar</h3>
         <p>I’m an HBO-ICT Software Engineering student at the Amsterdam University of Applied Sciences (HvA). I built Currency Quiz to experiment, deepen my backend knowledge, and demonstrate my full stack development skills.</p>
         <a class="footer-text-link" href="https://remzi.info" target="_blank" rel="noopener">More about me at remzi.info <AppIcon name="arrow" /></a>
       </section>

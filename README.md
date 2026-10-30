@@ -8,13 +8,15 @@ Your preferred round size and current or completed round are saved automatically
 
 ## API documentation
 
-Use the top navigation to switch between the quiz at `#/` and the documentation at `#/documentation`. Documentation sections have their own `#/documentation/:section` links. Vue Router uses hash routing so these links work on static hosts without server-side route rewrites. Browsing the documentation preserves the quiz view with Vue's `KeepAlive`; saved rounds also survive page reloads.
+Use the navigation to switch between the quiz at `/` and the documentation at `/documentation`. The Bulma navbar sits at the top on desktop and is fixed to the bottom below 1024px. Its mobile menu opens upward, closes on navigation, outside taps, or Escape, and supports keyboard focus. Content spacing and device safe-area padding keep the bottom bar clear of page controls. Documentation sections have their own `/documentation/:section` links, such as `/documentation/list-questions`. Vue Router uses browser history for clean URLs. Browsing the documentation preserves the quiz view with Vue's `KeepAlive`; saved rounds also survive page reloads.
 
-The documentation follows the OpenAPI contract in `shared/` and covers all seven operations: list, retrieve, create, update, and delete questions; check an answer; and obtain an admin token. It includes copyable request examples for JavaScript, PowerShell 7+, and Bash, example JSON, response statuses, authentication, and rate limits. Public quiz JavaScript examples work in the browser; authenticated examples are labelled Node.js and read `process.env.ADMIN_TOKEN`. Shared GET terminal commands are labelled for both shells, while requests with bodies have separate PowerShell and Bash examples. The original `shared/openapi/currency-quiz.v1.yaml` is imported with Vite's `?url` asset handling for viewing or downloading, so no separate contract copy needs maintenance.
+The documentation follows the OpenAPI contract in `shared/` and covers all seven operations: list, retrieve, create, update, and delete questions; check an answer; and obtain an admin token. It includes copyable request examples for JavaScript, PowerShell 7+, and Bash, example JSON, response statuses, authentication, and rate limits. Public quiz JavaScript examples work in the browser; authenticated examples are labelled Node.js and read `process.env.ADMIN_TOKEN`. Shared GET terminal commands are labelled for both shells, while requests with bodies have separate PowerShell and Bash examples. Public contract links lead to the [currency-quiz-shared repository](https://github.com/Remzi1993/currency-quiz-shared), and specification links open its [OpenAPI YAML on GitHub](https://github.com/Remzi1993/currency-quiz-shared/blob/main/openapi/currency-quiz.v1.yaml). The local shared contract still supplies generated client types; the website no longer bundles a separate YAML download.
 
 Reading the documentation needs no running backend. Its API base URL defaults to `VITE_API_BASE_URL`, or the frontend's origin when that setting is empty. Choosing another backend origin requires that backend to allow the frontend through CORS. Admin CRUD and login are documented with examples; the frontend does not collect admin credentials or provide live admin mutations.
 
 The live explorer can list questions, retrieve one question, and check an answer against the editable API base URL. It displays the HTTP status, response body, and elapsed time, formatting JSON when possible and preserving other responses as text. Each button press sends one request with a 60-second timeout and no automatic retry. An actual HTTP `503` displays the Render startup explanation; other failures use ordinary error handling. The explorer never sends admin requests, and answer checks count towards the backend's submission rate limit.
+
+The shared footer introduces the school project and its author, Remzi Çavdar, with his website, email addresses, and student number. It links to the API contract, backend, and frontend repositories with short explanations, the OpenAPI specification, and the project's MIT license. Repository and specification destinations are centralized in `src/projectLinks.ts` so documentation and footer links stay consistent.
 
 ## Run locally
 
@@ -83,17 +85,34 @@ npm run preview
 
 `typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client, quiz state, saved-session handling, and documentation example serialization without a running backend. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
 
+## Clean URLs and hosting
+
+Vue Router uses `createWebHistory(import.meta.env.BASE_URL)`. Opening `/index.html` redirects to `/`; unmatched paths display the frontend's not-found page. New page navigation scrolls to the top, while browser Back and Forward navigation restore saved scroll positions.
+
+The frontend host must serve `index.html` for frontend routes so a direct visit or refresh at `/documentation` or `/documentation/list-questions` can load the application. Vite's development server and `vite preview` provide this fallback locally; production hosting needs its own rewrite configuration.
+
+The root [netlify.toml](netlify.toml) configures Netlify to run `npm run build` with Node.js 26 and publish `dist/`. It rewrites `/`, `/documentation`, and `/documentation/:section` to `index.html` with HTTP `200`, then serves `index.html` with HTTP `404` for unmatched paths so Vue can show the not-found page. Existing static assets are served normally because these rewrites are not forced. The existing HSTS header is retained.
+
+For Netlify deployment, set `VITE_API_BASE_URL` in the build environment before building, or add a deliberate `/api` reverse-proxy rule before the page rewrites. The routing changes have been checked locally; a live Netlify deployment has not been verified.
+
 ## Code structure
 
 - `src/App.vue` and `src/components/`: application shell, navigation, shared instructions, and reusable visual components.
-- `src/router.ts`: Vue Router hash routes for the quiz and documentation; no static-host route rewrites are needed.
+- `src/components/AppNavbar.vue`: responsive Bulma navbar and Vue-managed mobile menu; no additional navigation dependency.
+- `src/components/AppFooter.vue`: large responsive footer with project repositories, MIT licensing, and author/contact information.
+- `src/components/CurrencyGlobe.vue`: front-page SVG globe with five enlarged currency symbols (`$`, `€`, `¥`, `£`, and `Fr.`) in decreasing sizes, without currency-code labels. Yen and renminbi share a single `¥` symbol.
+- `public/favicon.svg`: dollar sign inside a circle, shared by the browser favicon and the navbar image. Both point to `/favicon.svg`, so updating this single file updates both uses.
+- `src/projectLinks.ts`: shared GitHub repository and OpenAPI specification URLs used by the documentation and footer.
+- `src/router.ts`: Vue Router history routes, the `/index.html` redirect, not-found handling, and navigation scroll behavior.
 - `src/views/QuizView.vue`: quiz screens and interaction with the session composable.
 - `src/views/ApiDocsView.vue`: API reference, code examples, contract links, and public request explorer.
+- `src/views/NotFoundView.vue`: unmatched-route page with navigation back to the application.
 - `src/docs/apiReference.ts`: endpoint metadata and typed request/response examples, plus JavaScript and shell example builders.
 - `src/composables/useQuiz.ts`: session state, shuffling, submission, scoring, and retry handling.
 - `src/composables/quizStorage.ts`: versioned browser storage and saved-session validation.
 - `src/api/client.ts`: typed HTTP requests, response validation, timeouts, and API errors.
 - `src/style.css`: application styling layered over Bulma's CSS.
+- `netlify.toml`: production build settings, frontend route rewrites, HTTP 404 fallback, and HSTS response header for Netlify.
 - `shared/openapi/currency-quiz.v1.yaml`: API contract; `shared/generated/typescript/schema.d.ts` supplies the client types. Update the shared contract through its own repository rather than editing generated types.
 
 TypeScript uses `target: "ESNext"` and `lib: ["ESNext", "DOM", "DOM.Iterable"]` for the browser application. DOM libraries supply browser APIs such as `document` and `fetch`; they are needed alongside the latest JavaScript definitions. Vite also targets `esnext`, and the module-preload polyfill is disabled. The application assumes current browsers and adds no legacy-browser compatibility layer.

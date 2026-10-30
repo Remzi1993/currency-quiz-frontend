@@ -6,7 +6,7 @@ import {
   endpoints, exampleQuestionId, buildEndpointUrl,
   buildJavaScriptExample, buildShellExamples,
 } from '../docs/apiReference.ts'
-import openApiUrl from '../../shared/openapi/currency-quiz.v1.yaml?url'
+import { projectLinks } from '../projectLinks.ts'
 
 const route = useRoute()
 const sectionHeading = ref<HTMLElement | null>(null)
@@ -152,8 +152,8 @@ onBeforeUnmount(clearRequest)
       </div>
       <div class="docs-contract-links">
         <span class="tag">API v1 · JSON</span>
-        <a class="button is-light" :href="openApiUrl" target="_blank" rel="noopener">View OpenAPI <AppIcon name="arrow" /></a>
-        <a :href="openApiUrl" download="currency-quiz.v1.yaml">Download YAML</a>
+        <a class="button is-light" :href="projectLinks.openApiSpec" target="_blank" rel="noopener">View OpenAPI <AppIcon name="arrow" /></a>
+        <a :href="projectLinks.contract" target="_blank" rel="noopener">API contract on GitHub</a>
       </div>
     </header>
 
@@ -171,9 +171,9 @@ onBeforeUnmount(clearRequest)
             </ul>
           </template>
           <p class="menu-label">The source of truth</p>
-          <a class="docs-source-link" :href="openApiUrl" target="_blank" rel="noopener">shared/openapi/<br />currency-quiz.v1.yaml <AppIcon name="arrow" /></a>
+          <a class="docs-source-link" :href="projectLinks.contract" target="_blank" rel="noopener">currency-quiz-shared<br />API contract on GitHub <AppIcon name="arrow" /></a>
         </nav>
-        <div class="docs-sidebar-note"><AppIcon name="spark" /><p>Public questions.<br /><strong>No account or API key needed.</strong></p></div>
+        <div class="docs-sidebar-note"><AppIcon name="spark" /><p>Currency quiz API.<br /><strong>No account or API key needed.</strong></p></div>
       </aside>
 
       <article class="docs-content">
@@ -191,7 +191,7 @@ onBeforeUnmount(clearRequest)
             <p>Fetch the questions, show their options, and send an answer back to the API. The server checks correctness; public responses never include the correct answer.</p>
             <ol class="docs-steps">
               <li><span>01</span><div><strong>Get your questions</strong><p><RouterLink to="/documentation/list-questions">List all questions</RouterLink> and pick a question’s real <code>id</code>.</p></div></li>
-              <li><span>02</span><div><strong>Check an answer</strong><p>Send <code>{ "answer": "JPY" }</code> to <RouterLink to="/documentation/check-answer">the answer endpoint</RouterLink>. You’ll receive <code>{ "correct": true }</code> or <code>{ "correct": false }</code>.</p></div></li>
+              <li><span>02</span><div><strong>Check an answer</strong><p>Send <code>{ "answer": "Japanese yen" }</code> to <RouterLink to="/documentation/check-answer">the answer endpoint</RouterLink>. You’ll receive <code>{ "correct": true }</code> or <code>{ "correct": false }</code>.</p></div></li>
             </ol>
             <div class="notification docs-info"><AppIcon name="info" /><p>No pagination or random-question endpoint is defined. The list returns the available question bank; your application chooses the round length and question order.</p></div>
             <h3 class="docs-subheading">Start with a list of questions</h3>
@@ -249,7 +249,7 @@ onBeforeUnmount(clearRequest)
             <form @submit.prevent="sendRequest">
               <div v-if="exampleEndpoint.id === 'check-answer'" class="field">
                 <label class="label docs-field-label" for="live-answer">Your answer</label>
-                <input id="live-answer" v-model="answer" class="input" maxlength="200" required placeholder="JPY" />
+                <input id="live-answer" v-model="answer" class="input" maxlength="200" required placeholder="Japanese yen" />
               </div>
               <button class="button is-primary" :class="{ 'is-loading': isSending }" type="submit" :disabled="isSending || !baseUrl">Send {{ exampleEndpoint.method }} request <AppIcon name="arrow" /></button>
             </form>
@@ -274,7 +274,7 @@ onBeforeUnmount(clearRequest)
             <p><strong>429 Too Many Requests:</strong> respect the <code>Retry-After</code> header (seconds). Answer checks allow 30 submissions per minute per client IP; login allows 5 attempts per minute per client IP.</p>
             <p><strong>503 Service Unavailable:</strong> this experimental school project uses Render’s Free plan. The backend may need up to a minute to wake after inactivity. Hosting responses may be HTML; only an actual HTTP 503 is treated as possible startup. Other failures need to be handled as errors.</p>
             <p><strong>Browser access:</strong> the backend must allow your application’s origin through CORS. Use HTTPS outside local development.</p>
-            <p>The <a :href="openApiUrl" target="_blank" rel="noopener">OpenAPI contract</a> defines all request fields, validation rules, and responses.</p>
+            <p>The <a :href="projectLinks.contract" target="_blank" rel="noopener">API contract repository</a> contains the <a :href="projectLinks.openApiSpec" target="_blank" rel="noopener">OpenAPI specification</a> defining all request fields, validation rules, and responses.</p>
           </section>
         </template>
         <section v-else class="box docs-not-found">

@@ -19,6 +19,7 @@
   --green: #184c3b;
   --muted: #70786d;
   --line: #dfe3d8;
+  --mobile-navbar-height: 72px;
 }
 
 body { min-width: 320px; margin: 0; }
@@ -28,12 +29,9 @@ button { touch-action: manipulation; }
 :focus-visible { outline: 3px solid #638a46; outline-offset: 5px; }
 [tabindex='-1']:focus { outline: none; }
 .app-shell { max-width: 1416px; margin-inline: auto; padding-inline: 64px; }
-.site-header { min-height: 112px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); }
 .brand { display: flex; gap: 12px; align-items: center; font-size: 25px; letter-spacing: -1px; font-weight: 700; color: var(--green); }
 .brand-light { font-weight: 400; }
 .brand-dot { color: #779451; }
-.brand-mark { display: grid; place-items: center; width: 40px; height: 44px; border-radius: 11px; background: var(--green); color: #d6edbd; }
-.brand-mark .app-icon { width: 26px; height: 26px; }
 .header-note { margin-left: auto; color: #879080; font-size: 12px; }
 .app-icon { flex: none; width: 20px; height: 20px; display: inline-block; vertical-align: middle; }
 .button { gap: 10px; font-weight: 600; border-radius: 8px; box-shadow: none; }
@@ -94,8 +92,6 @@ h1 em { font-family: Georgia, 'Times New Roman', serif; color: var(--green); fon
 .step-number { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 50%; border: 1px solid #d8e0cf; color: #7e916b; font-size: 10px; flex: none; }
 .how-step h2 { font-size: 12px; font-weight: 600; color: #3a4a35; margin-bottom: 5px; }
 .how-step p { font-size: 10px; line-height: 1.7; color: #858d7d; }
-.site-footer { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding-block: 25px; font-size: 10px; color: #89917f; }
-.footer-star { margin-inline: 9px; color: #6c8356; }
 .state-box { min-height: 450px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
 .state-icon { display: grid; place-items: center; border-radius: 14px; width: 58px; height: 58px; margin-bottom: 24px; background: #edf2e5; color: var(--green); }
 .state-icon .app-icon { width: 28px; height: 28px; }
@@ -186,8 +182,13 @@ fieldset:disabled .answer-option:not(.is-selected) { opacity: .6; background: #f
 .help-steps { padding-left: 19px; font-size: 13px; line-height: 1.8; margin-block: 20px; }
 .help-steps li + li { margin-top: 10px; }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 25px; }
-.skip-link { position: fixed; top: -100px; left: 16px; z-index: 10; padding: 12px 20px; border-radius: 8px; background: var(--green); color: white; }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 40; padding: 12px 20px; border-radius: 8px; background: var(--green); color: white; }
 .skip-link:focus-visible { top: 16px; color: white; }
+
+@media (max-width: 1023px) {
+  html { scroll-padding-bottom: calc(var(--mobile-navbar-height) + env(safe-area-inset-bottom) + 16px); }
+  .app-shell { padding-bottom: calc(var(--mobile-navbar-height) + env(safe-area-inset-bottom)); }
+}
 
 @media (min-width: 1500px) {
   .main-content { padding-block: 78px 68px; gap: 90px; }
@@ -210,7 +211,6 @@ fieldset:disabled .answer-option:not(.is-selected) { opacity: .6; background: #f
 }
 @media (max-width: 800px) {
   .app-shell { padding-inline: 26px; }
-  .site-header { min-height: 88px; }
   .header-note { display: none; }
   .main-content { grid-template-columns: 1fr; gap: 35px; padding-block: 40px; }
   .intro-panel { padding-top: 0; }
@@ -238,8 +238,6 @@ fieldset:disabled .answer-option:not(.is-selected) { opacity: .6; background: #f
 @media (max-width: 440px) {
   .app-shell { padding-inline: 20px; }
   .brand { font-size: 22px; gap: 9px; }
-  .brand-mark { width: 33px; height: 37px; border-radius: 9px; }
-  .brand-mark .app-icon { width: 22px; height: 22px; }
   .help-button { font-size: 11px; padding-inline: 5px; gap: 6px; }
   h1 { font-size: 43px; }
   .intro-panel > .eyebrow { font-size: 7px; letter-spacing: 1px; gap: 7px; }
@@ -261,7 +259,6 @@ fieldset:disabled .answer-option:not(.is-selected) { opacity: .6; background: #f
   .question-bottom > span { max-width: 160px; line-height: 1.7; }
   .how-step h2 { font-size: 10px; }
   .how-it-works { gap: 13px; }
-  .site-footer { font-size: 9px; align-items: flex-start; flex-direction: column; gap: 8px; padding-block: 22px; }
   .help-dialog.box { padding: 28px 24px; }
   .desktop-break { display: none; }
 }

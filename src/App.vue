@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import AppIcon from './components/AppIcon.vue'
+import AppNavbar from './components/AppNavbar.vue'
+import AppFooter from './components/AppFooter.vue'
 
 const route = useRoute()
 const helpDialog = ref<HTMLDialogElement | null>(null)
@@ -11,7 +13,9 @@ function focusMain() {
 }
 
 watch(() => route.name, async (name, previous) => {
-  document.title = name === 'documentation' ? 'API Documentation · Currency Quiz' : 'Currency Quiz'
+  document.title = name === 'documentation'
+    ? 'API Documentation · Currency Quiz'
+    : name === 'not-found' ? 'Page not found · Currency Quiz' : 'Currency Quiz'
   if (previous === undefined) return
   await nextTick()
   focusMain()
@@ -21,19 +25,7 @@ watch(() => route.name, async (name, previous) => {
 <template>
   <a href="#main-content" class="skip-link" @click.prevent="focusMain">Skip to content</a>
   <div class="app-shell">
-    <header class="site-header">
-      <RouterLink to="/" class="brand" aria-label="Currency Quiz home">
-        <span class="brand-mark"><AppIcon name="globe" /></span>
-        <span>currency<span class="brand-light">quiz</span><span class="brand-dot">.</span></span>
-      </RouterLink>
-      <nav class="site-navigation" aria-label="Main navigation">
-        <RouterLink to="/" class="navigation-link">Quiz</RouterLink>
-        <RouterLink to="/documentation" class="navigation-link">Documentation</RouterLink>
-      </nav>
-      <button class="button is-ghost help-button" type="button" @click="helpDialog?.showModal()">
-        <AppIcon name="info" /> <span>How to play</span>
-      </button>
-    </header>
+    <AppNavbar @show-help="helpDialog?.showModal()" />
 
     <RouterView v-slot="{ Component }">
       <KeepAlive include="QuizView">
@@ -41,7 +33,7 @@ watch(() => route.name, async (name, previous) => {
       </KeepAlive>
     </RouterView>
 
-    <footer class="site-footer"><span>Made for a little everyday discovery.</span><span>Currency Quiz <span class="footer-star">✳</span> Stay curious.</span></footer>
+    <AppFooter />
   </div>
 
   <dialog ref="helpDialog" class="box help-dialog" aria-labelledby="help-heading" @click="(event) => { if (event.target === helpDialog) helpDialog?.close() }">
@@ -54,61 +46,3 @@ watch(() => route.name, async (name, previous) => {
     <button class="button is-primary primary-action" type="button" @click="helpDialog?.close()">Got it <AppIcon name="check" /></button>
   </dialog>
 </template>
-
-<style scoped>
-.site-navigation {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.navigation-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 10px 14px;
-  border-radius: 7px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  transition: background .15s, color .15s;
-}
-
-.navigation-link:hover {
-  background: #edf1e6;
-  color: var(--green);
-}
-
-.navigation-link.router-link-active {
-  background: #e8eedf;
-  color: var(--green);
-}
-
-@media (max-width: 600px) {
-  .site-header {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 14px 8px;
-    padding-block: 20px 14px;
-  }
-
-  .site-navigation {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: center;
-    margin-left: 0;
-  }
-
-  .navigation-link {
-    flex: 1;
-    max-width: 190px;
-  }
-
-  .help-button {
-    grid-column: 2;
-    grid-row: 1;
-  }
-}
-</style>

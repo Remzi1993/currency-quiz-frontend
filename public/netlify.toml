@@ -12,6 +12,16 @@ from = "/"
 to = "/index.html"
 status = 200
 
+[[redirects]]
+from = "/documentation"
+to = "/index.html"
+status = 200
+
+[[redirects]]
+from = "/documentation/:section"
+to = "/index.html"
+status = 200
+
 # 404
 [[redirects]]
 from = "/*"

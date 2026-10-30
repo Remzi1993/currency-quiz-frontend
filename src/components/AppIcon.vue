@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'arrow' | 'check' | 'close' | 'globe' | 'spark' | 'refresh' | 'info' | 'flag' }>()
+defineProps<{ name: 'arrow' | 'check' | 'close' | 'globe' | 'spark' | 'refresh' | 'info' | 'flag' | 'book' }>()
 
 const paths = {
   arrow: 'M5 12h14m-6-6 6 6-6 6',
@@ -10,6 +10,7 @@ const paths = {
   refresh: 'M20 7v5h-5M4 17v-5h5M6.1 6.1a8 8 0 0 1 13 3M4.9 14.9a8 8 0 0 0 13 3',
   info: 'M12 11v6M12 7v.01',
   flag: 'M5 21V4c5-4 9 4 14 0v10c-5 4-9-4-14 0',
+  book: 'M12 5v16M3 3l9 2 9-2v16l-9 2-9-2V3Z',
 }
 </script>
 

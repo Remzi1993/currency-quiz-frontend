@@ -35,11 +35,11 @@ export type ApiEndpoint = {
   }[HttpMethod]
 }[keyof paths]
 
-export const exampleQuestionId = '58d6497e-227a-4bc4-938e-159f449df87e'
+export const exampleQuestionId = 'c72b3aab-633f-4268-88e7-c6ba1c3bb217'
 export const publicQuestionExample: components['schemas']['PublicQuestion'] = {
   id: exampleQuestionId,
   text: 'Which currency is used in Japan?',
-  options: ['USD', 'EUR', 'JPY', 'GBP'],
+  options: ['Chinese yuan', 'Japanese yen', 'South Korean won', 'Thai baht'],
 }
 
 const adminQuestionExample: components['schemas']['AdminQuestion'] = { ...publicQuestionExample, correctAnswer: 'JPY' }
@@ -61,12 +61,12 @@ export const endpoints: ApiEndpoint[] = [
     description: 'Get the question bank and its answer options to begin a quiz. No account is needed.',
     responseBody: [publicQuestionExample], successStatus: 200,
     notes: [
-      'Public questions never include the correct answer. Use the answer-checking endpoint to grade a choice.',
+      'Questions never include the correct answer. Use the answer-checking endpoint to grade a choice.',
       'New installations start with 40 sample questions; the list can be empty after administration changes.',
       'Requests from a disallowed browser origin return 403.',
     ],
     responses: [
-      { status: 200, description: 'An array of public questions.' },
+      { status: 200, description: 'An array of questions.' },
       { status: 403, description: 'The request origin is not allowed.' }, internalError,
     ],
   },
@@ -82,7 +82,7 @@ export const endpoints: ApiEndpoint[] = [
     id: 'check-answer', title: 'Check an answer', label: 'Check an answer', group: 'Public quiz',
     method: 'POST', path: '/api/v1/questions/{id}/answers', auth: false,
     description: 'Ask the server whether an answer is correct. The response reveals only the outcome.',
-    parameters: idParameter, requestBody: { answer: 'JPY' }, responseBody: { correct: true }, successStatus: 200,
+    parameters: idParameter, requestBody: { answer: 'Japanese yen' }, responseBody: { correct: true }, successStatus: 200,
     notes: [
       'An incorrect answer is also a successful HTTP 200 response: { "correct": false }.',
       'Limited to 30 submissions per minute per client IP across all questions. A 429 response includes Retry-After seconds.',
@@ -112,7 +112,7 @@ export const endpoints: ApiEndpoint[] = [
     requestBody: {
       text: publicQuestionExample.text,
       options: publicQuestionExample.options,
-      correctAnswer: 'JPY',
+      correctAnswer: 'Japanese yen',
     },
     responseBody: adminQuestionExample, successStatus: 201,
     notes: [

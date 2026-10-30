@@ -1,4 +1,4 @@
-import { computed, getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import {
   ApiError,
   loadQuestions,
@@ -6,6 +6,7 @@ import {
   type AnswerResult,
   type Question,
 } from '../api/client.ts'
+import { getQuizStorage, readQuizState, writeQuizState, type QuizStorage } from './quizStorage.ts'
 
 export type QuizPhase = 'loading' | 'welcome' | 'playing' | 'results' | 'error' | 'empty'
 
@@ -20,6 +21,7 @@ interface QuizServices {
   submitAnswer: (questionId: string, answer: string) => Promise<AnswerResult>
   random: () => number
   now: () => number
+  storage: QuizStorage | null
 }
 
 const STARTUP_TIMEOUT_MS = 60_000
@@ -44,10 +46,12 @@ function waitForRetry(milliseconds: number, signal: AbortSignal): Promise<void> 
 /** One quiz session. The API remains the only source of answer correctness. */
 export function useQuiz(services: Partial<QuizServices> = {}) {
   const api = { loadQuestions, submitAnswer, random: Math.random, now: Date.now, ...services }
+  const storage = services.storage === undefined ? getQuizStorage() : services.storage
+  const savedState = readQuizState(storage)
   const phase = ref<QuizPhase>('loading')
   const questions = shallowRef<Question[]>([])
   const sessionQuestions = shallowRef<Question[]>([])
-  const questionCount = ref(10)
+  const questionCount = ref(savedState?.questionCount ?? 10)
   const questionIndex = ref(0)
   const selectedAnswer = ref<string | null>(null)
   const answerResult = shallowRef<AnswerResult | null>(null)
@@ -58,12 +62,49 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
   const retryAt = ref<number | null>(null)
   let operation = 0
   let cancelLoading: (() => void) | undefined
+  let initialized = false
+  let changingSession = false
 
   const currentQuestion = computed(() => sessionQuestions.value[questionIndex.value])
   const currentNumber = computed(() => questionIndex.value + 1)
   const totalQuestions = computed(() => sessionQuestions.value.length)
   const correctCount = computed(() => records.value.filter(({ correct }) => correct).length)
+  const incorrectCount = computed(() => records.value.length - correctCount.value)
   const progress = computed(() => totalQuestions.value === 0 ? 0 : records.value.length / totalQuestions.value * 100)
+
+  function persist() {
+    writeQuizState(storage, {
+      version: 1,
+      questionCount: questionCount.value,
+      session: phase.value === 'playing' || phase.value === 'results' ? {
+        phase: phase.value,
+        questions: questions.value,
+        sessionQuestions: sessionQuestions.value,
+        questionIndex: questionIndex.value,
+        selectedAnswer: selectedAnswer.value,
+        records: records.value,
+        correctCount: correctCount.value,
+        incorrectCount: incorrectCount.value,
+        retryAt: retryAt.value,
+        error: error.value,
+      } : null,
+    })
+  }
+
+  // Save a complete transition together, so no partial round is written between assignments.
+  function changeSession(change: () => void) {
+    changingSession = true
+    try {
+      change()
+    } finally {
+      changingSession = false
+      persist()
+    }
+  }
+
+  watch([questionCount, selectedAnswer], () => {
+    if (!changingSession) persist()
+  }, { flush: 'sync' })
 
   function clearSession() {
     operation++
@@ -81,10 +122,12 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
   }
 
   async function load() {
-    clearSession()
+    changeSession(() => {
+      clearSession()
+      questions.value = []
+      phase.value = 'loading'
+    })
     const loadingOperation = operation
-    questions.value = []
-    phase.value = 'loading'
     const controller = new AbortController()
     const deadline = api.now() + STARTUP_TIMEOUT_MS
     const timeoutError = new DOMException('Question loading timed out', 'TimeoutError')
@@ -131,19 +174,44 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
     }
   }
 
+  async function initialize() {
+    if (initialized) return
+    initialized = true
+    const session = savedState?.session
+    if (!session) {
+      await load()
+      return
+    }
+    changeSession(() => {
+      clearSession()
+      questions.value = session.questions
+      sessionQuestions.value = session.sessionQuestions
+      questionIndex.value = session.questionIndex
+      selectedAnswer.value = session.selectedAnswer
+      records.value = session.records
+      const currentRecord = session.records[session.questionIndex]
+      answerResult.value = currentRecord ? { correct: currentRecord.correct } : null
+      retryAt.value = session.retryAt
+      error.value = session.error
+      phase.value = session.phase
+    })
+  }
+
   function start() {
     if (phase.value !== 'welcome' || questions.value.length === 0) return
-    clearSession()
-    const shuffled = [...questions.value]
-    for (let index = shuffled.length - 1; index > 0; index--) {
-      const other = Math.floor(api.random() * (index + 1))
-      const item = shuffled[index]!
-      shuffled[index] = shuffled[other]!
-      shuffled[other] = item
-    }
-    const requested = Number.isFinite(questionCount.value) ? Math.max(1, Math.floor(questionCount.value)) : 10
-    sessionQuestions.value = shuffled.slice(0, Math.min(requested, shuffled.length))
-    phase.value = 'playing'
+    changeSession(() => {
+      clearSession()
+      const shuffled = [...questions.value]
+      for (let index = shuffled.length - 1; index > 0; index--) {
+        const other = Math.floor(api.random() * (index + 1))
+        const item = shuffled[index]!
+        shuffled[index] = shuffled[other]!
+        shuffled[other] = item
+      }
+      const requested = Number.isFinite(questionCount.value) ? Math.max(1, Math.floor(questionCount.value)) : 10
+      sessionQuestions.value = shuffled.slice(0, Math.min(requested, shuffled.length))
+      phase.value = 'playing'
+    })
   }
 
   async function submit() {
@@ -160,6 +228,7 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
     isSubmitting.value = true
     error.value = null
     retryAt.value = null
+    persist()
     try {
       const result = await api.submitAnswer(question.id, answer)
       if (submittingOperation !== operation) return
@@ -172,26 +241,33 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
         retryAt.value = api.now() + (cause.retryAfter ?? 60) * 1000
       }
     } finally {
-      if (submittingOperation === operation) isSubmitting.value = false
+      if (submittingOperation === operation) {
+        isSubmitting.value = false
+        persist()
+      }
     }
   }
 
   function next() {
     if (phase.value !== 'playing' || !answerResult.value || isSubmitting.value) return
-    if (questionIndex.value + 1 >= totalQuestions.value) {
-      phase.value = 'results'
-      return
-    }
-    questionIndex.value++
-    selectedAnswer.value = null
-    answerResult.value = null
-    error.value = null
-    retryAt.value = null
+    changeSession(() => {
+      if (questionIndex.value + 1 >= totalQuestions.value) {
+        phase.value = 'results'
+        return
+      }
+      questionIndex.value++
+      selectedAnswer.value = null
+      answerResult.value = null
+      error.value = null
+      retryAt.value = null
+    })
   }
 
   function restart() {
-    clearSession()
-    phase.value = questions.value.length === 0 ? 'empty' : 'welcome'
+    changeSession(() => {
+      clearSession()
+      phase.value = questions.value.length === 0 ? 'empty' : 'welcome'
+    })
   }
 
   // Invalidate pending work when the owning component goes away.
@@ -204,7 +280,7 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
   return {
     phase, questions, sessionQuestions, questionCount, questionIndex, currentNumber,
     currentQuestion, totalQuestions, selectedAnswer, answerResult, records,
-    correctCount, progress, error, isSubmitting, isWakingUp, retryAt,
-    load, start, submit, next, restart,
+    correctCount, incorrectCount, progress, error, isSubmitting, isWakingUp, retryAt,
+    initialize, load, start, submit, next, restart,
   }
 }

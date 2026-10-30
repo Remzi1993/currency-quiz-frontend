@@ -20,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isQuestion(value: unknown): value is Question {
+export function isQuestion(value: unknown): value is Question {
   if (!isRecord(value)) return false
 
   const { id, text, options } = value

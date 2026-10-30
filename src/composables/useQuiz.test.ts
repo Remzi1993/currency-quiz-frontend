@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { setImmediate } from 'node:timers/promises'
 import { effectScope } from 'vue'
 import { ApiError, type AnswerResult, type Question } from '../api/client.ts'
+import { QUIZ_STORAGE_KEY, readQuizState, type QuizStorage } from './quizStorage.ts'
 import { useQuiz } from './useQuiz.ts'
 
 const questions: Question[] = [
@@ -16,6 +17,7 @@ function fixture(overrides: Parameters<typeof useQuiz>[0] = {}) {
     loadQuestions: async () => questions,
     submitAnswer: async () => ({ correct: true }),
     random: () => 0,
+    storage: null,
     ...overrides,
   })
 }
@@ -367,4 +369,268 @@ test('scope disposal cancels the wake-up delay without another request', async (
   assert.equal(calls, 1)
   assert.equal(quiz.questions.value.length, 0)
   assert.equal(quiz.error.value, null)
+})
+
+function memoryStorage() {
+  const values = new Map<string, string>()
+  const storage: QuizStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value) },
+    removeItem: (key) => { values.delete(key) },
+  }
+  return { storage, values }
+}
+
+test('saves the preferred question count immediately without requiring a round', async () => {
+  const { storage } = memoryStorage()
+  const quiz = fixture({ storage })
+  quiz.questionCount.value = 2
+  assert.deepEqual(readQuizState(storage), { version: 1, questionCount: 2, session: null })
+
+  let loads = 0
+  const restored = fixture({ storage, loadQuestions: async () => { loads++; return questions } })
+  assert.equal(restored.questionCount.value, 2)
+  await restored.initialize()
+  assert.equal(loads, 1)
+  assert.equal(restored.phase.value, 'welcome')
+  assert.equal(restored.questionCount.value, 2)
+  assert.equal(restored.correctCount.value, 0)
+  assert.equal(restored.incorrectCount.value, 0)
+})
+
+test('restores an unanswered round, its shuffled order and selected answer without contacting the backend', async () => {
+  const { storage, values } = memoryStorage()
+  const quiz = fixture({ storage })
+  await quiz.initialize()
+  quiz.questionCount.value = 2
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[1]!
+  const order = quiz.sessionQuestions.value.map(({ id }) => id)
+  assert.equal(values.has(QUIZ_STORAGE_KEY), true)
+
+  let calls = 0
+  const unavailable = async (): Promise<never> => { calls++; throw new Error('Backend unavailable') }
+  const restored = fixture({ storage, loadQuestions: unavailable, submitAnswer: unavailable })
+  await restored.initialize()
+  assert.equal(calls, 0)
+  assert.equal(restored.phase.value, 'playing')
+  assert.equal(restored.questionCount.value, 2)
+  assert.equal(restored.questionIndex.value, 0)
+  assert.deepEqual(restored.questions.value, questions)
+  assert.deepEqual(restored.sessionQuestions.value.map(({ id }) => id), order)
+  assert.equal(restored.selectedAnswer.value, quiz.selectedAnswer.value)
+  assert.equal(restored.answerResult.value, null)
+  assert.equal(restored.records.value.length, 0)
+  assert.equal(restored.isSubmitting.value, false)
+})
+
+test('restores correct feedback and prevents submitting the checked answer a second time', async () => {
+  const { storage } = memoryStorage()
+  const quiz = fixture({ storage })
+  await quiz.initialize()
+  quiz.questionCount.value = 2
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+
+  let posts = 0
+  const restored = fixture({ storage, submitAnswer: async () => { posts++; return { correct: false } } })
+  await restored.initialize()
+  assert.equal(restored.phase.value, 'playing')
+  assert.equal(restored.correctCount.value, 1)
+  assert.equal(restored.incorrectCount.value, 0)
+  assert.equal(restored.answerResult.value?.correct, true)
+  assert.equal(restored.selectedAnswer.value, quiz.selectedAnswer.value)
+  assert.deepEqual(restored.records.value, quiz.records.value)
+  await restored.submit()
+  assert.equal(posts, 0)
+  assert.equal(restored.records.value.length, 1)
+  restored.next()
+  assert.equal(restored.questionIndex.value, 1)
+  assert.equal(restored.selectedAnswer.value, null)
+  assert.equal(restored.answerResult.value, null)
+})
+
+test('restores a later unanswered question, selection and previous score in the original order', async () => {
+  const { storage } = memoryStorage()
+  const quiz = fixture({ storage })
+  await quiz.initialize()
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+  quiz.next()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[1]!
+
+  const restored = fixture({ storage })
+  await restored.initialize()
+  assert.equal(restored.questionIndex.value, 1)
+  assert.equal(restored.currentNumber.value, 2)
+  assert.equal(restored.currentQuestion.value?.id, quiz.currentQuestion.value?.id)
+  assert.deepEqual(restored.sessionQuestions.value, quiz.sessionQuestions.value)
+  assert.equal(restored.selectedAnswer.value, quiz.selectedAnswer.value)
+  assert.equal(restored.answerResult.value, null)
+  assert.equal(restored.correctCount.value, 1)
+  assert.equal(restored.incorrectCount.value, 0)
+  assert.equal(restored.records.value.length, 1)
+  assert.ok(Math.abs(restored.progress.value - 100 / 3) < 1e-9)
+})
+
+test('restores incorrect feedback together with both correct and incorrect totals', async () => {
+  const { storage } = memoryStorage()
+  let submissions = 0
+  const quiz = fixture({ storage, submitAnswer: async () => ({ correct: ++submissions === 1 }) })
+  await quiz.initialize()
+  quiz.questionCount.value = 2
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+  quiz.next()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[1]!
+  await quiz.submit()
+
+  const restored = fixture({ storage, submitAnswer: async () => { submissions++; return { correct: true } } })
+  await restored.initialize()
+  assert.equal(restored.phase.value, 'playing')
+  assert.equal(restored.questionIndex.value, 1)
+  assert.equal(restored.answerResult.value?.correct, false)
+  assert.equal(restored.correctCount.value, 1)
+  assert.equal(restored.incorrectCount.value, 1)
+  assert.equal(restored.progress.value, 100)
+  assert.deepEqual(restored.records.value, quiz.records.value)
+  await restored.submit()
+  assert.equal(submissions, 2)
+  restored.next()
+  assert.equal(restored.phase.value, 'results')
+})
+
+test('restores the completed results and review records without fetching or posting', async () => {
+  const { storage } = memoryStorage()
+  let submissions = 0
+  const quiz = fixture({ storage, submitAnswer: async () => ({ correct: ++submissions === 1 }) })
+  await quiz.initialize()
+  quiz.questionCount.value = 2
+  quiz.start()
+  for (let index = 0; index < 2; index++) {
+    quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+    await quiz.submit()
+    quiz.next()
+  }
+  assert.equal(quiz.phase.value, 'results')
+
+  let requests = 0
+  const unavailable = async (): Promise<never> => { requests++; throw new Error('Backend unavailable') }
+  const restored = fixture({ storage, loadQuestions: unavailable, submitAnswer: unavailable })
+  await restored.initialize()
+  assert.equal(requests, 0)
+  assert.equal(restored.phase.value, 'results')
+  assert.equal(restored.currentNumber.value, 2)
+  assert.equal(restored.totalQuestions.value, 2)
+  assert.equal(restored.correctCount.value, 1)
+  assert.equal(restored.incorrectCount.value, 1)
+  assert.equal(restored.progress.value, 100)
+  assert.deepEqual(restored.records.value, quiz.records.value)
+  await restored.submit()
+  assert.equal(requests, 0)
+})
+
+test('leaving or replaying clears the saved round while keeping its count preference', async () => {
+  for (const complete of [false, true]) {
+    const { storage } = memoryStorage()
+    const quiz = fixture({ storage })
+    await quiz.initialize()
+    quiz.questionCount.value = 1
+    quiz.start()
+    quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+    if (complete) {
+      await quiz.submit()
+      quiz.next()
+      assert.equal(quiz.phase.value, 'results')
+    }
+    quiz.restart()
+    assert.deepEqual(readQuizState(storage), { version: 1, questionCount: 1, session: null })
+    assert.equal(quiz.correctCount.value, 0)
+    assert.equal(quiz.incorrectCount.value, 0)
+
+    let loads = 0
+    const restored = fixture({ storage, loadQuestions: async () => { loads++; return questions } })
+    await restored.initialize()
+    assert.equal(loads, 1)
+    assert.equal(restored.phase.value, 'welcome')
+    assert.equal(restored.questionCount.value, 1)
+    assert.equal(restored.records.value.length, 0)
+  }
+})
+
+test('an explicit question reload replaces a saved round and retains the count preference', async () => {
+  const { storage } = memoryStorage()
+  let loads = 0
+  const quiz = fixture({ storage, loadQuestions: async () => { loads++; return questions } })
+  await quiz.initialize()
+  quiz.questionCount.value = 2
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+  await quiz.load()
+  assert.equal(loads, 2)
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.questionCount.value, 2)
+  assert.equal(quiz.records.value.length, 0)
+  assert.deepEqual(readQuizState(storage), { version: 1, questionCount: 2, session: null })
+})
+
+test('blocked browser storage does not prevent loading, playing or replaying', async () => {
+  const blocked: QuizStorage = {
+    getItem: () => { throw new DOMException('Blocked', 'SecurityError') },
+    setItem: () => { throw new DOMException('Blocked', 'SecurityError') },
+    removeItem: () => { throw new DOMException('Blocked', 'SecurityError') },
+  }
+  const quiz = fixture({ storage: blocked })
+  await quiz.initialize()
+  quiz.questionCount.value = 1
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+  quiz.next()
+  assert.equal(quiz.phase.value, 'results')
+  assert.equal(quiz.correctCount.value, 1)
+  quiz.restart()
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.questionCount.value, 1)
+})
+
+test('restores the absolute rate-limit deadline and retries only after a new user submission', async () => {
+  const { storage } = memoryStorage()
+  let now = 1000
+  const quiz = fixture({ storage, now: () => now, submitAnswer: async () => {
+    throw new ApiError('Too many requests', { status: 429, retryAfter: 3 })
+  } })
+  await quiz.initialize()
+  quiz.start()
+  quiz.selectedAnswer.value = quiz.currentQuestion.value!.options[0]!
+  await quiz.submit()
+  assert.equal(quiz.retryAt.value, 4000)
+
+  now = 2000
+  let posts = 0
+  const restored = fixture({ storage, now: () => now, submitAnswer: async () => {
+    posts++
+    return { correct: true }
+  } })
+  await restored.initialize()
+  assert.equal(posts, 0)
+  assert.equal(restored.phase.value, 'playing')
+  assert.equal(restored.retryAt.value, 4000)
+  assert.equal(restored.error.value, 'Too many requests')
+  assert.equal(restored.selectedAnswer.value, quiz.selectedAnswer.value)
+  assert.equal(restored.records.value.length, 0)
+  assert.equal(restored.answerResult.value, null)
+  await restored.submit()
+  assert.equal(posts, 0)
+  now = 4000
+  assert.equal(posts, 0)
+  await restored.submit()
+  assert.equal(posts, 1)
+  assert.equal(restored.retryAt.value, null)
+  assert.equal(restored.error.value, null)
+  assert.equal(restored.correctCount.value, 1)
 })

@@ -4,6 +4,6 @@
     "types": ["vite/client", "node"],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo"
   },
-  "include": ["src/api/**/*.ts", "src/composables/**/*.ts", "src/vite-env.d.ts"],
+  "include": ["src/api/**/*.ts", "src/composables/**/*.ts", "src/docs/**/*.ts", "src/vite-env.d.ts"],
   "exclude": []
 }

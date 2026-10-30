@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "typecheck": "vue-tsc -b && tsc -p tsconfig.test.json",
-    "test": "node --test src/api/client.test.ts src/composables/useQuiz.test.ts",
+    "test": "node --test src/api/client.test.ts src/composables/useQuiz.test.ts src/composables/quizStorage.test.ts src/docs/apiReference.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

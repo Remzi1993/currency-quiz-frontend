@@ -2,7 +2,19 @@
 
 A public quiz frontend for `currency-quiz-backend`, built with Vue 3, TypeScript 6, Vite 8, and Bulma 1. Bulma's precompiled CSS provides the layout, controls, and components; no Sass compiler or CSS framework JavaScript is needed. `openapi-fetch` uses the generated types from the API contract in `shared/`.
 
-Choose 10, 20, or all available questions and play a shuffled round. Each answer is checked once by the backend. The frontend shows feedback, progress, a final score, and a review of your submitted answers. The public API returns correctness only, so an incorrect answer does not reveal the correct option. Quiz state stays in memory and resets when the page reloads. No account or admin interface is included.
+Choose 10, 20, or all available questions and play a shuffled round. Each answer is checked once by the backend. The frontend shows feedback, question progress, correct and incorrect totals, a final score, and a review of your submitted answers. The public API returns correctness only, so an incorrect answer does not reveal the correct option. No account or admin interface is included.
+
+Your preferred round size and current or completed round are saved automatically in versioned `localStorage`. Refreshing restores the same question order, position, selection, checked feedback, score, and rate-limit deadline before requesting new questions. Leaving a round or choosing another round clears that session while keeping your preferred round size; the welcome screen loads the current question bank. Invalid saved data is ignored, and unavailable browser storage falls back to an in-memory session. No credentials are stored.
+
+## API documentation
+
+Use the top navigation to switch between the quiz at `#/` and the documentation at `#/documentation`. Documentation sections have their own `#/documentation/:section` links. Vue Router uses hash routing so these links work on static hosts without server-side route rewrites. Browsing the documentation preserves the quiz view with Vue's `KeepAlive`; saved rounds also survive page reloads.
+
+The documentation follows the OpenAPI contract in `shared/` and covers all seven operations: list, retrieve, create, update, and delete questions; check an answer; and obtain an admin token. It includes copyable request examples for JavaScript, PowerShell 7+, and Bash, example JSON, response statuses, authentication, and rate limits. Public quiz JavaScript examples work in the browser; authenticated examples are labelled Node.js and read `process.env.ADMIN_TOKEN`. Shared GET terminal commands are labelled for both shells, while requests with bodies have separate PowerShell and Bash examples. The original `shared/openapi/currency-quiz.v1.yaml` is imported with Vite's `?url` asset handling for viewing or downloading, so no separate contract copy needs maintenance.
+
+Reading the documentation needs no running backend. Its API base URL defaults to `VITE_API_BASE_URL`, or the frontend's origin when that setting is empty. Choosing another backend origin requires that backend to allow the frontend through CORS. Admin CRUD and login are documented with examples; the frontend does not collect admin credentials or provide live admin mutations.
+
+The live explorer can list questions, retrieve one question, and check an answer against the editable API base URL. It displays the HTTP status, response body, and elapsed time, formatting JSON when possible and preserving other responses as text. Each button press sends one request with a 60-second timeout and no automatic retry. An actual HTTP `503` displays the Render startup explanation; other failures use ordinary error handling. The explorer never sends admin requests, and answer checks count towards the backend's submission rate limit.
 
 ## Run locally
 
@@ -69,12 +81,17 @@ npm run build
 npm run preview
 ```
 
-`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client and quiz state without a running backend. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
+`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client, quiz state, saved-session handling, and documentation example serialization without a running backend. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
 
 ## Code structure
 
-- `src/App.vue` and `src/components/`: quiz screens and reusable visual components.
+- `src/App.vue` and `src/components/`: application shell, navigation, shared instructions, and reusable visual components.
+- `src/router.ts`: Vue Router hash routes for the quiz and documentation; no static-host route rewrites are needed.
+- `src/views/QuizView.vue`: quiz screens and interaction with the session composable.
+- `src/views/ApiDocsView.vue`: API reference, code examples, contract links, and public request explorer.
+- `src/docs/apiReference.ts`: endpoint metadata and typed request/response examples, plus JavaScript and shell example builders.
 - `src/composables/useQuiz.ts`: session state, shuffling, submission, scoring, and retry handling.
+- `src/composables/quizStorage.ts`: versioned browser storage and saved-session validation.
 - `src/api/client.ts`: typed HTTP requests, response validation, timeouts, and API errors.
 - `src/style.css`: application styling layered over Bulma's CSS.
 - `shared/openapi/currency-quiz.v1.yaml`: API contract; `shared/generated/typescript/schema.d.ts` supplies the client types. Update the shared contract through its own repository rather than editing generated types.

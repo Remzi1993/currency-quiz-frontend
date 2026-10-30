@@ -52,6 +52,12 @@ Restart Vite after changing environment variables. For a separately hosted backe
 
 For production, either forward `/api` from the frontend host to the backend or set `VITE_API_BASE_URL` before building. Vite's development proxy is unavailable in the production build and in `vite preview`.
 
+### Render startup handling
+
+This experimental school project uses Render's free plan, so the backend may need up to a minute to wake. When loading questions, an explicit HTTP `503` triggers a startup notice and retries every five seconds, within a total 60-second window measured from the initial request. A `503` is treated as possible startup; it does not prove the service is waking. A successful response ends the wait, while any other error immediately uses the normal error state. After the window expires, the user can retry manually.
+
+Network errors, timeouts, and other HTTP statuses do not trigger startup handling. The browser must be able to read the actual response through CORS; a CORS-blocked response appears as a generic network error. Answer submissions are never retried automatically. These behaviors are covered locally; a real Render cold start has not been verified.
+
 ## Checks and production build
 
 **PowerShell 7+ and Linux/Bash:**

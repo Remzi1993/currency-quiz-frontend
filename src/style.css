@@ -103,6 +103,7 @@ h1 em { font-family: Georgia, 'Times New Roman', serif; color: var(--green); fon
 .state-box .muted { line-height: 1.9; font-size: 13px; }
 .state-box .primary-action { margin-top: 28px; }
 .loading-progress { margin-top: 35px; width: 100%; }
+.startup-note { margin-top: 16px; }
 .progress.is-primary { --bulma-progress-value-background-color: var(--green); --bulma-progress-bar-background-color: #e8ecdf; }
 .round-progress { height: 4px; border-radius: 2px; margin-block: 19px 34px; }
 .question-topline { display: flex; justify-content: space-between; align-items: center; gap: 10px; }

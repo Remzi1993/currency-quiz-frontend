@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { setImmediate } from 'node:timers/promises'
 import { effectScope } from 'vue'
 import { ApiError, type AnswerResult, type Question } from '../api/client.ts'
 import { useQuiz } from './useQuiz.ts'
@@ -163,4 +164,207 @@ test('ignores stale loads and pending responses after scope disposal', async () 
   await pending
   assert.equal(quiz.questions.value.length, 0)
   assert.equal(quiz.phase.value, 'loading')
+})
+
+test('keeps the loading screen during HTTP 503 wake-up retries and clears it on success', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  const requestTimes: number[] = []
+  const quiz = fixture({ loadQuestions: async () => {
+    requestTimes.push(Date.now())
+    if (requestTimes.length < 3) throw new ApiError('Service unavailable', { status: 503 })
+    return questions
+  } })
+  const pending = quiz.load()
+  await setImmediate()
+  assert.equal(quiz.phase.value, 'loading')
+  assert.equal(quiz.isWakingUp.value, true)
+  assert.equal(quiz.error.value, null)
+
+  t.mock.timers.tick(4999)
+  await setImmediate()
+  assert.deepEqual(requestTimes, [0])
+  t.mock.timers.tick(1)
+  await setImmediate()
+  assert.deepEqual(requestTimes, [0, 5000])
+  assert.equal(quiz.phase.value, 'loading')
+  assert.equal(quiz.isWakingUp.value, true)
+
+  t.mock.timers.tick(5000)
+  await pending
+  assert.deepEqual(requestTimes, [0, 5000, 10000])
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.isWakingUp.value, false)
+  assert.equal(quiz.error.value, null)
+  assert.deepEqual(quiz.questions.value, questions)
+  t.mock.timers.tick(60_000)
+  await setImmediate()
+  assert.equal(requestTimes.length, 3)
+})
+
+test('does not retry other HTTP statuses, network errors, timeouts, or invalid responses', async (t) => {
+  const failures = [
+    new ApiError('Internal server error', { status: 500 }),
+    new ApiError('Bad gateway', { status: 502 }),
+    new ApiError('Origin forbidden', { status: 403 }),
+    new ApiError('Too many requests', { status: 429, retryAfter: 5 }),
+    new ApiError('Could not reach the quiz service', { cause: new TypeError('Failed to fetch') }),
+    new ApiError('The request timed out', { cause: new DOMException('Timed out', 'TimeoutError') }),
+    new ApiError('The quiz service returned invalid questions'),
+  ]
+  for (const failure of failures) {
+    for (const after503 of [false, true]) {
+      await t.test(`${failure.message}${after503 ? ' after HTTP 503' : ' on the first request'}`, async (caseTest) => {
+        caseTest.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+        let calls = 0
+        const quiz = fixture({ loadQuestions: async () => {
+          calls++
+          if (after503 && calls === 1) throw new ApiError('Service unavailable', { status: 503 })
+          throw failure
+        } })
+        const pending = quiz.load()
+        await setImmediate()
+        if (after503) {
+          assert.equal(quiz.isWakingUp.value, true)
+          caseTest.mock.timers.tick(5000)
+        }
+        await pending
+        assert.equal(quiz.phase.value, 'error')
+        assert.equal(quiz.isWakingUp.value, false)
+        assert.equal(quiz.error.value, failure.message)
+        assert.equal(calls, after503 ? 2 : 1)
+        caseTest.mock.timers.tick(120_000)
+        await setImmediate()
+        assert.equal(calls, after503 ? 2 : 1)
+      })
+    }
+  }
+})
+
+test('includes the initial request in the one-minute wake-up budget and allows manual recovery', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  const requestTimes: number[] = []
+  let available = false
+  const quiz = fixture({ loadQuestions: async () => {
+    requestTimes.push(Date.now())
+    if (available) return questions
+    if (requestTimes.length === 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 10_000))
+    }
+    throw new ApiError('Service unavailable', { status: 503 })
+  } })
+  const pending = quiz.load()
+  t.mock.timers.tick(10_000)
+  await setImmediate()
+  assert.equal(quiz.isWakingUp.value, true)
+  for (let elapsed = 15_000; elapsed <= 55_000; elapsed += 5000) {
+    t.mock.timers.tick(5000)
+    await setImmediate()
+    assert.equal(quiz.phase.value, 'loading')
+  }
+  assert.deepEqual(requestTimes, [0, 15_000, 20_000, 25_000, 30_000, 35_000, 40_000, 45_000, 50_000, 55_000])
+  t.mock.timers.tick(5000)
+  await pending
+  assert.equal(Date.now(), 60_000)
+  assert.equal(quiz.phase.value, 'error')
+  assert.equal(quiz.isWakingUp.value, false)
+  assert.match(quiz.error.value!, /still unavailable after one minute/)
+  t.mock.timers.tick(120_000)
+  await setImmediate()
+  assert.equal(requestTimes.length, 10)
+
+  available = true
+  await quiz.load()
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.error.value, null)
+  assert.equal(quiz.isWakingUp.value, false)
+  assert.deepEqual(quiz.questions.value, questions)
+})
+
+test('aborts a hung retry at one minute measured from the initial GET', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  const requestTimes: number[] = []
+  let retrySignal: AbortSignal | undefined
+  let abortedAt: number | undefined
+  const quiz = fixture({ loadQuestions: async (signal) => {
+    requestTimes.push(Date.now())
+    if (requestTimes.length === 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 12_000))
+      throw new ApiError('Service unavailable', { status: 503 })
+    }
+    retrySignal = signal
+    return new Promise<Question[]>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => {
+        abortedAt = Date.now()
+        reject(signal!.reason)
+      }, { once: true })
+    })
+  } })
+  const pending = quiz.load()
+  t.mock.timers.tick(12_000)
+  await setImmediate()
+  t.mock.timers.tick(5000)
+  await setImmediate()
+  assert.deepEqual(requestTimes, [0, 17_000])
+  assert.equal(retrySignal?.aborted, false)
+  assert.equal(quiz.isWakingUp.value, true)
+  t.mock.timers.tick(42_999)
+  await setImmediate()
+  assert.equal(quiz.phase.value, 'loading')
+  assert.equal(retrySignal?.aborted, false)
+  t.mock.timers.tick(1)
+  await pending
+  assert.equal(abortedAt, 60_000)
+  assert.equal(retrySignal?.aborted, true)
+  assert.equal(quiz.phase.value, 'error')
+  assert.equal(quiz.isWakingUp.value, false)
+  assert.match(quiz.error.value!, /still unavailable after one minute/)
+})
+
+test('reloading cancels the old wake-up delay and keeps the newer load result', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  let calls = 0
+  let firstSignal: AbortSignal | undefined
+  const quiz = fixture({ loadQuestions: async (signal) => {
+    if (++calls === 1) {
+      firstSignal = signal
+      throw new ApiError('Service unavailable', { status: 503 })
+    }
+    return questions
+  } })
+  const abandoned = quiz.load()
+  await setImmediate()
+  assert.equal(quiz.isWakingUp.value, true)
+  t.mock.timers.tick(2500)
+  await quiz.load()
+  await abandoned
+  assert.equal(firstSignal?.aborted, true)
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.isWakingUp.value, false)
+  t.mock.timers.tick(120_000)
+  await setImmediate()
+  assert.equal(calls, 2)
+  assert.deepEqual(quiz.questions.value, questions)
+})
+
+test('scope disposal cancels the wake-up delay without another request', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  let calls = 0
+  let signal: AbortSignal | undefined
+  const scope = effectScope()
+  const quiz = scope.run(() => fixture({ loadQuestions: async (requestSignal) => {
+    calls++
+    signal = requestSignal
+    throw new ApiError('Service unavailable', { status: 503 })
+  } }))!
+  const pending = quiz.load()
+  await setImmediate()
+  assert.equal(quiz.isWakingUp.value, true)
+  scope.stop()
+  await pending
+  assert.equal(signal?.aborted, true)
+  t.mock.timers.tick(120_000)
+  await setImmediate()
+  assert.equal(calls, 1)
+  assert.equal(quiz.questions.value.length, 0)
+  assert.equal(quiz.error.value, null)
 })

@@ -7,7 +7,7 @@ import { useQuiz } from './composables/useQuiz.ts'
 const {
   phase, questions, questionCount, currentQuestion, currentNumber, totalQuestions,
   selectedAnswer, answerResult, records, correctCount, progress, error,
-  isSubmitting, retryAt, load, start, submit, next, restart,
+  isSubmitting, isWakingUp, retryAt, load, start, submit, next, restart,
 } = useQuiz()
 
 const helpDialog = ref<HTMLDialogElement | null>(null)
@@ -100,8 +100,16 @@ onMounted(load)
       <section class="quiz-panel" aria-label="Currency quiz">
         <div v-if="phase === 'loading'" class="box quiz-box state-box" aria-live="polite" aria-busy="true">
           <span class="state-icon"><AppIcon name="globe" /></span>
-          <h2 class="panel-title">A world of questions awaits.</h2>
-          <p class="muted">Getting your quiz ready…</p>
+          <template v-if="isWakingUp">
+            <p class="eyebrow">EXPERIMENTAL SCHOOL PROJECT</p>
+            <h2 class="panel-title">The quiz service is waking up.</h2>
+            <p class="muted">This website is a prototype for a school project, the backend is hosted on Render and uses the Free plan. The backend goes to sleep after periods of inactivity and needs to start up again.</p>
+            <p class="muted startup-note">Startup can take up to one minute. We’re checking automatically — you can keep this page open.</p>
+          </template>
+          <template v-else>
+            <h2 class="panel-title">A world of questions awaits.</h2>
+            <p class="muted">Getting your quiz ready…</p>
+          </template>
           <progress class="progress is-small is-primary loading-progress" max="100">Loading questions</progress>
         </div>
 

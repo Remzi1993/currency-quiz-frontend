@@ -16,10 +16,29 @@ export interface AnswerRecord {
 }
 
 interface QuizServices {
-  loadQuestions: () => Promise<Question[]>
+  loadQuestions: (signal?: AbortSignal) => Promise<Question[]>
   submitAnswer: (questionId: string, answer: string) => Promise<AnswerResult>
   random: () => number
   now: () => number
+}
+
+const STARTUP_TIMEOUT_MS = 60_000
+const STARTUP_RETRY_MS = 5_000
+
+function waitForRetry(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', cancel)
+      resolve()
+    }, milliseconds)
+    function cancel() {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', cancel)
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', cancel, { once: true })
+    if (signal.aborted) cancel()
+  })
 }
 
 /** One quiz session. The API remains the only source of answer correctness. */
@@ -35,8 +54,10 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
   const records = shallowRef<AnswerRecord[]>([])
   const error = ref<string | null>(null)
   const isSubmitting = ref(false)
+  const isWakingUp = ref(false)
   const retryAt = ref<number | null>(null)
   let operation = 0
+  let cancelLoading: (() => void) | undefined
 
   const currentQuestion = computed(() => sessionQuestions.value[questionIndex.value])
   const currentNumber = computed(() => questionIndex.value + 1)
@@ -46,6 +67,9 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
 
   function clearSession() {
     operation++
+    cancelLoading?.()
+    cancelLoading = undefined
+    isWakingUp.value = false
     sessionQuestions.value = []
     questionIndex.value = 0
     selectedAnswer.value = null
@@ -61,15 +85,49 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
     const loadingOperation = operation
     questions.value = []
     phase.value = 'loading'
+    const controller = new AbortController()
+    const deadline = api.now() + STARTUP_TIMEOUT_MS
+    const timeoutError = new DOMException('Question loading timed out', 'TimeoutError')
+    const timeout = setTimeout(() => controller.abort(timeoutError), STARTUP_TIMEOUT_MS)
+    cancelLoading = () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
     try {
-      const loaded = await api.loadQuestions()
-      if (loadingOperation !== operation) return
-      questions.value = loaded
-      phase.value = loaded.length === 0 ? 'empty' : 'welcome'
+      while (true) {
+        if (controller.signal.aborted || api.now() >= deadline) {
+          controller.abort(timeoutError)
+          throw controller.signal.reason
+        }
+        try {
+          const loaded = await api.loadQuestions(controller.signal)
+          if (loadingOperation !== operation) return
+          if (controller.signal.aborted) throw controller.signal.reason
+          questions.value = loaded
+          phase.value = loaded.length === 0 ? 'empty' : 'welcome'
+          return
+        } catch (cause) {
+          if (loadingOperation !== operation) return
+          if (!(cause instanceof ApiError) || cause.status !== 503) throw cause
+          // Only an actual HTTP 503 starts the Render wake-up experience.
+          isWakingUp.value = true
+          await waitForRetry(Math.min(STARTUP_RETRY_MS, Math.max(0, deadline - api.now())), controller.signal)
+        }
+      }
     } catch (cause) {
       if (loadingOperation !== operation) return
-      error.value = cause instanceof Error ? cause.message : 'The questions could not be loaded. Please try again.'
+      error.value = controller.signal.aborted
+        ? isWakingUp.value
+          ? 'The quiz service is still unavailable after one minute. There may be a hosting or backend problem. Please try again later.'
+          : 'The quiz service took too long to respond. Please try again.'
+        : cause instanceof Error ? cause.message : 'The questions could not be loaded. Please try again.'
       phase.value = 'error'
+    } finally {
+      clearTimeout(timeout)
+      if (loadingOperation === operation) {
+        cancelLoading = undefined
+        isWakingUp.value = false
+      }
     }
   }
 
@@ -137,12 +195,16 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
   }
 
   // Invalidate pending work when the owning component goes away.
-  if (getCurrentScope()) onScopeDispose(() => { operation++ })
+  if (getCurrentScope()) onScopeDispose(() => {
+    operation++
+    cancelLoading?.()
+    cancelLoading = undefined
+  })
 
   return {
     phase, questions, sessionQuestions, questionCount, questionIndex, currentNumber,
     currentQuestion, totalQuestions, selectedAnswer, answerResult, records,
-    correctCount, progress, error, isSubmitting, retryAt,
+    correctCount, progress, error, isSubmitting, isWakingUp, retryAt,
     load, start, submit, next, restart,
   }
 }

@@ -115,6 +115,110 @@ test('uses safe fallback messages for server errors and invalid retry headers', 
   )
 })
 
+test('preserves HTTP 503 before parsing hosting error bodies', async () => {
+  const bodies = [
+    { body: '<!doctype html><title>Service unavailable</title>', contentType: 'text/html' },
+    { body: 'Service unavailable', contentType: 'text/plain' },
+    { body: JSON.stringify({ message: 'Service unavailable' }), contentType: 'application/json' },
+    { body: '{malformed JSON', contentType: 'application/json' },
+  ]
+
+  for (const { body, contentType } of bodies) {
+    const api = createQuizApi({
+      baseUrl: 'http://quiz.test',
+      fetch: async () => new Response(body, { status: 503, headers: { 'Content-Type': contentType } }),
+    })
+    await assert.rejects(api.loadQuestions(), (error: unknown) => {
+      assert.ok(error instanceof ApiError)
+      assert.equal(error.status, 503)
+      assert.match(error.message, /service is having trouble/)
+      assert.doesNotMatch(error.message, /Render|cold start|warming|unreadable/i)
+      return true
+    })
+  }
+})
+
+test('preserves other HTTP statuses without inferring a cold start', async () => {
+  const api = createQuizApi({
+    baseUrl: 'http://quiz.test',
+    fetch: async () => new Response('<!doctype html><title>Internal error</title>', {
+      status: 500,
+      headers: { 'Content-Type': 'text/html' },
+    }),
+  })
+  await assert.rejects(api.loadQuestions(), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.status, 500)
+    assert.doesNotMatch(error.message, /Render|cold start|warming/i)
+    return true
+  })
+})
+
+test('rejects an HTTP failure without consuming a broken response body', async () => {
+  const body = new ReadableStream({
+    start(controller) { controller.error(new Error('Body stream failed')) },
+  })
+  const api = createQuizApi({
+    baseUrl: 'http://quiz.test',
+    fetch: async () => new Response(body, { status: 503 }),
+  })
+  await assert.rejects(api.loadQuestions(), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.status, 503)
+    return true
+  })
+})
+
+test('passes the caller abort signal to the question request', async () => {
+  const controller = new AbortController()
+  const reason = new DOMException('Cancelled by caller', 'AbortError')
+  const api = createQuizApi({
+    baseUrl: 'http://quiz.test',
+    fetch: async (input) => {
+      assert.ok(input instanceof Request)
+      assert.equal(input.signal.aborted, false)
+      controller.abort(reason)
+      assert.equal(input.signal.aborted, true)
+      assert.equal(input.signal.reason, reason)
+      throw input.signal.reason
+    },
+  })
+  await assert.rejects(api.loadQuestions(controller.signal), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.cause, reason)
+    return true
+  })
+})
+
+test('allows 60 seconds for loading while answer checks retain their 15 second timeout', async (context) => {
+  const deadlines: number[] = []
+  context.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    deadlines.push(milliseconds)
+    return new AbortController().signal
+  })
+  await apiWithResponse([question]).loadQuestions()
+  await apiWithResponse({ correct: true }).submitAnswer(question.id, 'JPY')
+  await apiWithResponse([question]).loadQuestions(new AbortController().signal)
+  assert.deepEqual(deadlines, [60_000, 15_000])
+})
+
+test('does not automatically retry answer submissions on 503', async () => {
+  let attempts = 0
+  const api = createQuizApi({
+    baseUrl: 'http://quiz.test',
+    fetch: async () => {
+      attempts++
+      return new Response('Service unavailable', { status: 503 })
+    },
+  })
+  await assert.rejects(api.submitAnswer(question.id, 'JPY'), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.status, 503)
+    return true
+  })
+  assert.equal(attempts, 1)
+})
+
 test('reports network, timeout and invalid JSON failures as recoverable API errors', async () => {
   for (const [failure, message] of [
     [new TypeError('Failed to fetch'), /could not reach/],

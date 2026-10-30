@@ -81,15 +81,20 @@ export function createQuizApi(options: { baseUrl?: string; fetch?: typeof global
     baseUrl: (options.baseUrl ?? '').replace(/\/+$/, ''),
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
   })
+  client.use({
+    onResponse({ response }) {
+      // Hosting errors may be HTML or unreadable bodies. Preserve their HTTP status first.
+      if (!response.ok) throw responseError(response)
+    },
+  })
 
   return {
-    loadQuestions(): Promise<Question[]> {
+    loadQuestions(signal?: AbortSignal): Promise<Question[]> {
       return request(async () => {
-        const { data, response } = await client.GET('/api/v1/questions', {
-          signal: AbortSignal.timeout(15_000),
+        const { data } = await client.GET('/api/v1/questions', {
+          signal: signal ?? AbortSignal.timeout(60_000),
           headers: { Accept: 'application/json' },
         })
-        if (!response.ok) throw responseError(response)
         if (!Array.isArray(data) || !data.every(isQuestion) || new Set(data.map(({ id }) => id)).size !== data.length) {
           throw new ApiError('The quiz service returned invalid questions. Please try again.')
         }
@@ -99,13 +104,12 @@ export function createQuizApi(options: { baseUrl?: string; fetch?: typeof global
 
     submitAnswer(questionId: string, answer: string): Promise<AnswerResult> {
       return request(async () => {
-        const { data, response } = await client.POST('/api/v1/questions/{id}/answers', {
+        const { data } = await client.POST('/api/v1/questions/{id}/answers', {
           params: { path: { id: questionId } },
           body: { answer },
           signal: AbortSignal.timeout(15_000),
           headers: { Accept: 'application/json' },
         })
-        if (!response.ok) throw responseError(response)
         if (!isRecord(data) || Object.keys(data).length !== 1 || typeof data.correct !== 'boolean') {
           throw new ApiError('The quiz service returned an invalid answer result. Please try again.')
         }
@@ -122,8 +126,8 @@ function getApi() {
   return defaultApi
 }
 
-export function loadQuestions(): Promise<Question[]> {
-  return getApi().loadQuestions()
+export function loadQuestions(signal?: AbortSignal): Promise<Question[]> {
+  return getApi().loadQuestions(signal)
 }
 
 export function submitAnswer(questionId: string, answer: string): Promise<AnswerResult> {

@@ -1,6 +1,6 @@
 # Currency Quiz
 
-A public quiz frontend for `currency-quiz-backend`, built with Vue 3, TypeScript 6, Vite 8, and Bulma 1. Bulma's precompiled CSS provides the layout, controls, and components; no Sass compiler or CSS framework JavaScript is needed. `openapi-fetch` uses the generated types from the API contract in `shared/`.
+A public quiz frontend for `currency-quiz-backend`, built with Vue 3, TypeScript 6, Vite 8, and Bulma 1. Bulma's precompiled CSS provides the layout, controls, and components; no Sass compiler or CSS framework JavaScript is needed. The API client uses native `fetch` and imports named model types from the API contract in `shared/`.
 
 Choose 10, 20, or all available questions and play a shuffled round. Each answer is checked once by the backend. The frontend shows feedback, question progress, correct and incorrect totals, a final score, and a review of your submitted answers. The public API returns correctness only, so an incorrect answer does not reveal the correct option. No account or admin interface is included.
 
@@ -83,7 +83,9 @@ npm run build
 npm run preview
 ```
 
-`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client, quiz state, saved-session handling, and documentation example serialization without a running backend. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
+`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client, quiz state, saved-session handling, and documentation example serialization without a running backend. The `yaml` development dependency lets the documentation tests read the shared OpenAPI file and compare the documented operations, response codes, and authentication with the actual contract. It is not used in the browser bundle. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
+
+Run these checks after updating the shared submodule. Its generated declarations now export named models such as `PublicQuestion` and `AnswerResponse`, without the former `components` or `paths` types. The frontend consumes these committed declarations and validates incoming JSON at runtime; no contract generation or Java installation is needed in this project. Endpoint metadata is maintained in the frontend and checked against the OpenAPI YAML by the tests. `npm run dev` transpiles TypeScript without typechecking, so a working development server alone does not confirm that a production build will pass.
 
 ## Clean URLs and hosting
 
@@ -110,7 +112,7 @@ For Netlify deployment, set `VITE_API_BASE_URL` in the build environment before 
 - `src/docs/apiReference.ts`: endpoint metadata and typed request/response examples, plus JavaScript and shell example builders.
 - `src/composables/useQuiz.ts`: session state, shuffling, submission, scoring, and retry handling.
 - `src/composables/quizStorage.ts`: versioned browser storage and saved-session validation.
-- `src/api/client.ts`: typed HTTP requests, response validation, timeouts, and API errors.
+- `src/api/client.ts`: native `fetch` requests using generated model types, response validation, timeouts, and API errors.
 - `src/style.css`: application styling layered over Bulma's CSS.
 - `netlify.toml`: production build settings, frontend route rewrites, HTTP 404 fallback, and HSTS response header for Netlify.
 - `shared/openapi/currency-quiz.v1.yaml`: API contract; `shared/generated/typescript/schema.d.ts` supplies the client types. Update the shared contract through its own repository rather than editing generated types.

@@ -1,12 +1,7 @@
-import type { components, paths } from '../../shared/generated/typescript/schema'
-
-type HttpMethod = 'get' | 'post' | 'patch' | 'delete'
-type JsonRequest<Operation> = Operation extends { requestBody: { content: { 'application/json': infer Body } } } ? Body : never
-type ResponseStatus<Operation> = Operation extends { responses: infer Responses } ? keyof Responses & number : never
-type SuccessStatus<Operation> = Extract<ResponseStatus<Operation>, 200 | 201 | 204>
-type JsonResponse<Operation> = Operation extends { responses: infer Responses }
-  ? { [Status in keyof Responses & (200 | 201 | 204)]: Responses[Status] extends { content: { 'application/json': infer Body } } ? Body : never }[keyof Responses & (200 | 201 | 204)]
-  : never
+import type {
+  AdminQuestion, AnswerRequest, AnswerResponse, CreateQuestionRequest,
+  LoginRequest, PublicQuestion, TokenResponse, UpdateQuestionRequest,
+} from '../../shared/generated/typescript/schema'
 
 interface EndpointDetails {
   id: string
@@ -19,30 +14,41 @@ interface EndpointDetails {
   parameters?: Array<{ name: string; description: string; required: boolean; example: string }>
 }
 
-/** Only method/path combinations and JSON examples present in the generated contract are allowed. */
-export type ApiEndpoint = {
-  [Path in keyof paths]: {
-    [Method in HttpMethod]: paths[Path][Method] extends { responses: object }
-      ? EndpointDetails & {
-        method: Uppercase<Method>
-        path: Path
-        requestBody?: JsonRequest<paths[Path][Method]>
-        responseBody?: JsonResponse<paths[Path][Method]>
-        successStatus: SuccessStatus<paths[Path][Method]>
-        responses: Array<{ status: ResponseStatus<paths[Path][Method]>; description: string }>
-      }
-      : never
-  }[HttpMethod]
-}[keyof paths]
+type DocumentedOperation<
+  Id extends string,
+  Method extends 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  Path extends string,
+  ResponseBody,
+  Success extends number,
+  Errors extends number,
+  RequestBody = never,
+> = EndpointDetails & {
+  id: Id
+  method: Method
+  path: Path
+  successStatus: Success
+  responses: Array<{ status: Success | Errors; description: string }>
+} & ([RequestBody] extends [never] ? { requestBody?: never } : { requestBody: RequestBody })
+  & ([ResponseBody] extends [never] ? { responseBody?: never } : { responseBody: ResponseBody })
+
+/** Generated models type the examples; contract tests check the maintained endpoint metadata against OpenAPI. */
+export type ApiEndpoint =
+  | DocumentedOperation<'list-questions', 'GET', '/api/v1/questions', PublicQuestion[], 200, 403 | 500>
+  | DocumentedOperation<'get-question', 'GET', '/api/v1/questions/{id}', PublicQuestion, 200, 400 | 404 | 500>
+  | DocumentedOperation<'check-answer', 'POST', '/api/v1/questions/{id}/answers', AnswerResponse, 200, 400 | 404 | 415 | 429 | 500, AnswerRequest>
+  | DocumentedOperation<'login', 'POST', '/api/v1/auth/login', TokenResponse, 200, 400 | 401 | 415 | 429 | 500, LoginRequest>
+  | DocumentedOperation<'create-question', 'POST', '/api/v1/questions', AdminQuestion, 201, 400 | 401 | 415 | 500, CreateQuestionRequest>
+  | DocumentedOperation<'update-question', 'PATCH', '/api/v1/questions/{id}', AdminQuestion, 200, 400 | 401 | 404 | 415 | 500, UpdateQuestionRequest>
+  | DocumentedOperation<'delete-question', 'DELETE', '/api/v1/questions/{id}', never, 204, 400 | 401 | 404 | 500>
 
 export const exampleQuestionId = 'c72b3aab-633f-4268-88e7-c6ba1c3bb217'
-export const publicQuestionExample: components['schemas']['PublicQuestion'] = {
+export const publicQuestionExample: PublicQuestion = {
   id: exampleQuestionId,
   text: 'Which currency is used in Japan?',
   options: ['Chinese yuan', 'Japanese yen', 'South Korean won', 'Thai baht'],
 }
 
-const adminQuestionExample: components['schemas']['AdminQuestion'] = { ...publicQuestionExample, correctAnswer: 'JPY' }
+const adminQuestionExample: AdminQuestion = { ...publicQuestionExample, correctAnswer: 'JPY' }
 const idParameter = [{
   name: 'id', required: true, example: exampleQuestionId,
   description: 'Question UUID in the URL. A malformed UUID returns 400; an unknown UUID returns 404.',

@@ -1,8 +1,7 @@
-import createClient from 'openapi-fetch'
-import type { components, paths } from '../../shared/generated/typescript/schema'
+import type { AnswerRequest, AnswerResponse, PublicQuestion } from '../../shared/generated/typescript/schema'
 
-export type Question = components['schemas']['PublicQuestion']
-export type AnswerResult = components['schemas']['AnswerResponse']
+export type Question = PublicQuestion
+export type AnswerResult = AnswerResponse
 
 export class ApiError extends Error {
   readonly status: number | undefined
@@ -77,21 +76,22 @@ async function request<T>(operation: () => Promise<T>): Promise<T> {
 
 /** Typed contract client. A custom fetch keeps HTTP behavior testable without a running backend. */
 export function createQuizApi(options: { baseUrl?: string; fetch?: typeof globalThis.fetch } = {}) {
-  const client = createClient<paths>({
-    baseUrl: (options.baseUrl ?? '').replace(/\/+$/, ''),
-    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-  })
-  client.use({
-    onResponse({ response }) {
-      // Hosting errors may be HTML or unreadable bodies. Preserve their HTTP status first.
-      if (!response.ok) throw responseError(response)
-    },
-  })
+  const baseUrl = (options.baseUrl ?? '').trim().replace(/\/+$/, '')
+  const fetchRequest = options.fetch ?? globalThis.fetch
+
+  async function requestJson(path: string, init: RequestInit): Promise<unknown> {
+    const response = await fetchRequest(new Request(`${baseUrl}${path}`, init))
+    // Hosting errors may be HTML or unreadable bodies. Preserve their HTTP status first.
+    if (!response.ok) throw responseError(response)
+    const text = await response.text()
+    return text ? JSON.parse(text) as unknown : undefined
+  }
 
   return {
     loadQuestions(signal?: AbortSignal): Promise<Question[]> {
       return request(async () => {
-        const { data } = await client.GET('/api/v1/questions', {
+        const data = await requestJson('/api/v1/questions', {
+          method: 'GET',
           signal: signal ?? AbortSignal.timeout(60_000),
           headers: { Accept: 'application/json' },
         })
@@ -104,11 +104,12 @@ export function createQuizApi(options: { baseUrl?: string; fetch?: typeof global
 
     submitAnswer(questionId: string, answer: string): Promise<AnswerResult> {
       return request(async () => {
-        const { data } = await client.POST('/api/v1/questions/{id}/answers', {
-          params: { path: { id: questionId } },
-          body: { answer },
+        const body: AnswerRequest = { answer }
+        const data = await requestJson(`/api/v1/questions/${encodeURIComponent(questionId)}/answers`, {
+          method: 'POST',
+          body: JSON.stringify(body),
           signal: AbortSignal.timeout(15_000),
-          headers: { Accept: 'application/json' },
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         })
         if (!isRecord(data) || Object.keys(data).length !== 1 || typeof data.correct !== 'boolean') {
           throw new ApiError('The quiz service returned an invalid answer result. Please try again.')

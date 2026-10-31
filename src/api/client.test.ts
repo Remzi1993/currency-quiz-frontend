@@ -46,6 +46,34 @@ test('submits the selected answer to the server and preserves an incorrect 200 r
   assert.deepEqual(await apiWithResponse({ correct: true }).submitAnswer(question.id, 'JPY'), { correct: true })
 })
 
+test('preserves a configured backend path prefix and encodes question IDs as one path segment', async () => {
+  const api = createQuizApi({
+    baseUrl: '  https://quiz.test/backend///  ',
+    fetch: async (input) => {
+      assert.ok(input instanceof Request)
+      assert.equal(input.url, input.method === 'GET'
+        ? 'https://quiz.test/backend/api/v1/questions'
+        : 'https://quiz.test/backend/api/v1/questions/id%2Fwith%20%3Fquery%23fragment/answers')
+      return Response.json(input.method === 'GET' ? [question] : { correct: false })
+    },
+  })
+  assert.deepEqual(await api.loadQuestions(), [question])
+  assert.deepEqual(await api.submitAnswer('id/with ?query#fragment', 'JPY'), { correct: false })
+})
+
+test('reports malformed and empty successful bodies through normal response validation', async () => {
+  for (const [body, message] of [
+    ['{invalid JSON', /unreadable response/],
+    ['', /invalid questions/],
+  ] as const) {
+    const api = createQuizApi({
+      baseUrl: 'https://quiz.test',
+      fetch: async () => new Response(body, { headers: { 'Content-Type': 'application/json' } }),
+    })
+    await assert.rejects(api.loadQuestions(), message)
+  }
+})
+
 test('rejects malformed question banks before rendering untrusted values', async () => {
   for (const payload of [
     {},

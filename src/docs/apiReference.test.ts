@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
+import { parse } from 'yaml'
 import {
   buildEndpointUrl, buildJavaScriptExample, buildShellExamples,
   endpoints, exampleQuestionId, publicQuestionExample, type ApiEndpoint,
@@ -11,22 +13,42 @@ function endpoint(id: string): ApiEndpoint {
   return found
 }
 
-test('covers all seven contract operations and their declared response statuses', () => {
-  const expected = new Map([
-    ['GET /api/v1/questions', [200, 403, 500]],
-    ['GET /api/v1/questions/{id}', [200, 400, 404, 500]],
-    ['POST /api/v1/questions/{id}/answers', [200, 400, 404, 415, 429, 500]],
-    ['POST /api/v1/auth/login', [200, 400, 401, 415, 429, 500]],
-    ['POST /api/v1/questions', [201, 400, 401, 415, 500]],
-    ['PATCH /api/v1/questions/{id}', [200, 400, 401, 404, 415, 500]],
-    ['DELETE /api/v1/questions/{id}', [204, 400, 401, 404, 500]],
-  ])
-  assert.equal(endpoints.length, expected.size)
+test('covers all OpenAPI operations and their declared request and response details', () => {
+  const httpMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const
+  type Security = Array<Record<string, string[]>>
+  interface Operation {
+    requestBody?: unknown
+    responses: Record<string, { content?: Record<string, unknown> }>
+    security?: Security
+  }
+  interface Contract {
+    paths: Record<string, Partial<Record<typeof httpMethods[number], Operation>>>
+    security?: Security
+  }
+  const contract = parse(readFileSync(new URL('../../shared/openapi/currency-quiz.v1.yaml', import.meta.url), 'utf8')) as Contract
+  const operations = new Map<string, Operation>()
+  for (const [path, item] of Object.entries(contract.paths)) {
+    for (const method of httpMethods) {
+      const operation = item[method]
+      if (operation) operations.set(`${method.toUpperCase()} ${path}`, operation)
+    }
+  }
+
+  const documentedOperations = endpoints.map(({ method, path }) => `${method} ${path}`)
+  assert.deepEqual(documentedOperations.toSorted(), [...operations.keys()].toSorted())
+  assert.equal(new Set(documentedOperations).size, endpoints.length)
   assert.equal(new Set(endpoints.map(({ id }) => id)).size, endpoints.length)
   for (const entry of endpoints) {
-    assert.deepEqual(entry.responses.map(({ status }) => status), expected.get(`${entry.method} ${entry.path}`))
-    assert.ok(entry.responses.some(({ status }) => status === entry.successStatus))
-    assert.equal(entry.auth, ['create-question', 'update-question', 'delete-question'].includes(entry.id))
+    const key = `${entry.method} ${entry.path}`
+    const operation = operations.get(key)
+    assert.ok(operation, `Missing OpenAPI operation: ${key}`)
+    const statuses = Object.keys(operation.responses).map(Number).toSorted((first, second) => first - second)
+    assert.deepEqual(entry.responses.map(({ status }) => status).toSorted((first, second) => first - second), statuses, `${key} response statuses`)
+    assert.ok(statuses.includes(entry.successStatus) && entry.successStatus >= 200 && entry.successStatus < 300, `${key} success status`)
+    const security = operation.security ?? contract.security ?? []
+    assert.equal(entry.auth, security.length > 0 && security.every((requirement) => Object.hasOwn(requirement, 'adminBearer')), `${key} admin authentication`)
+    assert.equal(entry.requestBody !== undefined, operation.requestBody !== undefined, `${key} request body`)
+    assert.equal(entry.responseBody !== undefined, operation.responses[String(entry.successStatus)]?.content?.['application/json'] !== undefined, `${key} response body`)
     assert.equal(Boolean(entry.parameters?.length), entry.path.includes('{id}'))
   }
 })

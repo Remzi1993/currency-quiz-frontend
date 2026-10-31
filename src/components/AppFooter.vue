@@ -72,6 +72,13 @@ const repositories = [
       </section>
     </div>
 
+    <div class="footer-hosting">
+      <p>We deploy on:</p>
+      <a href="https://www.netlify.com" target="_blank" rel="noopener">
+        <img src="https://www.netlify.com/assets/badges/netlify-badge-color-accent.svg" alt="Deploys by Netlify" width="114" height="50" loading="lazy" />
+      </a>
+    </div>
+
     <div class="footer-bottom">
       <p>Built to learn. Shared to build on.</p>
       <nav aria-label="Project resources">
@@ -123,6 +130,10 @@ const repositories = [
 .footer-contact address > span { color: #f4f6e9; }
 .footer-student { margin-top: 17px; color: #b6cba5; font-size: 11px; }
 .footer-student > span { margin-left: 10px; color: #e0edce; font-variant-numeric: tabular-nums; }
+.footer-hosting { display: flex; align-items: center; gap: 14px; padding-block: 22px; border-top: 1px solid #47634f; font-size: 12px; }
+.footer-hosting p { white-space: nowrap; }
+.footer-hosting a { display: inline-flex; flex: none; }
+.footer-hosting img { display: block; width: 114px; height: 50px; }
 .footer-bottom { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-top: 22px; border-top: 1px solid #47634f; font-size: 10px; line-height: 1.8; }
 .footer-bottom nav { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; }
 .footer-bottom nav a { display: inline-flex; align-items: center; gap: 5px; }

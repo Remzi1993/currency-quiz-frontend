@@ -1,4 +1,5 @@
 # Currency Quiz
+[![Netlify Status](https://api.netlify.com/api/v1/badges/145cc2a1-785d-4c30-861f-ba99cd95a5d2/deploy-status)](https://app.netlify.com/projects/currency-quiz/deploys)
 
 A public quiz frontend for `currency-quiz-backend`, built with Vue 3, TypeScript 6, Vite 8, and Bulma 1. Bulma's precompiled CSS provides the layout, controls, and components; no Sass compiler or CSS framework JavaScript is needed. The API client uses native `fetch` and imports named model types from the API contract in `shared/`.
 
@@ -118,3 +119,19 @@ For Netlify deployment, set `VITE_API_BASE_URL` in the build environment before 
 - `shared/openapi/currency-quiz.v1.yaml`: API contract; `shared/generated/typescript/schema.d.ts` supplies the client types. Update the shared contract through its own repository rather than editing generated types.
 
 TypeScript uses `target: "ESNext"` and `lib: ["ESNext", "DOM", "DOM.Iterable"]` for the browser application. DOM libraries supply browser APIs such as `document` and `fetch`; they are needed alongside the latest JavaScript definitions. Vite also targets `esnext`, and the module-preload polyfill is disabled. The application assumes current browsers and adds no legacy-browser compatibility layer.
+
+## Continuous integration
+
+The [Frontend CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual Actions runs. It checks out the pinned `shared/` submodule, installs locked dependencies with Node.js 26, then runs type checking → tests → build. A failure prevents later steps from running. The workflow builds the application without deploying it or changing Netlify settings. See [CI/CD Basics](docs/managing-and-collaborating/starting-points/ci-cd-basics.md) for the workflow structure, stage order and log diagnosis.
+
+Actions are pinned to full commit IDs with release-version comments; update both together when upgrading. After committing and pushing the workflow, open **Actions → Frontend CI** to inspect a run. Manual runs become available from the default branch. To require successful checks before merging, add its `checks` status to the branch ruleset after the first run. Netlify deployment gates are configured separately.
+
+Run the same checks from the frontend root in **PowerShell 7+ and Linux/Bash**:
+
+```sh
+git submodule update --init --recursive
+npm ci
+npm run typecheck
+npm test
+npm run build
+```

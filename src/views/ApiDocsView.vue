@@ -9,6 +9,7 @@ import {
 import { projectLinks } from '../projectLinks.ts'
 
 const route = useRoute()
+const swaggerUrl = `${import.meta.env.BASE_URL}swagger/`
 const sectionHeading = ref<HTMLElement | null>(null)
 const baseUrlInput = ref(import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') || window.location.origin)
 const questionId = ref(exampleQuestionId)
@@ -152,6 +153,7 @@ onBeforeUnmount(clearRequest)
       </div>
       <div class="docs-contract-links">
         <span class="tag">API v1 · JSON</span>
+        <a class="button is-light" :href="swaggerUrl">Swagger UI <AppIcon name="arrow" /></a>
         <a class="button is-light" :href="projectLinks.openApiSpec" target="_blank" rel="noopener">View OpenAPI <AppIcon name="arrow" /></a>
         <a :href="projectLinks.contract" target="_blank" rel="noopener">API contract on GitHub</a>
       </div>

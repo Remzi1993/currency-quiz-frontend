@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light dark;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: light-dark(#f6f7f2, #111b17);
+  color: light-dark(#253b30, #d8e5d5);
+  --swagger-page: light-dark(#f6f7f2, #111b17);
+  --swagger-surface: light-dark(#fffefa, #19251f);
+  --swagger-soft: light-dark(#edf1e6, #22332a);
+  --swagger-ink: light-dark(#24392e, #e4eee4);
+  --swagger-green: light-dark(#184c3b, #a8d8ad);
+  --swagger-muted: light-dark(#64705f, #aab8a8);
+  --swagger-line: light-dark(#dfe3d8, #3b4b40);
+  --swagger-focus: light-dark(#638a46, #a8cf80);
+  --swagger-action: light-dark(#184c3b, #b8dca1);
+  --swagger-action-ink: light-dark(#fffefa, #14251a);
+}
+
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--swagger-page); color: var(--swagger-ink); }
+a { color: var(--swagger-green); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--swagger-focus); outline-offset: 4px; }
+[tabindex='-1']:focus { outline: none; }
+.swagger-page { width: min(1320px, 100%); margin-inline: auto; padding: 0 48px 48px; }
+.swagger-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 104px; border-bottom: 1px solid var(--swagger-line); }
+.swagger-brand { display: inline-flex; align-items: center; gap: 12px; color: var(--swagger-green); font-size: 25px; font-weight: 700; letter-spacing: -1px; text-decoration: none; white-space: nowrap; }
+.swagger-brand img { flex: none; }
+.swagger-brand-light { font-weight: 400; }
+.swagger-navigation { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px 22px; font-size: 12px; }
+.swagger-navigation a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; }
+.swagger-back-link { padding: 0 14px; border: 1px solid var(--swagger-line); border-radius: 8px; background: var(--swagger-surface); font-weight: 600; text-decoration: none; }
+.swagger-back-link:hover { background: var(--swagger-soft); }
+.swagger-introduction { padding-block: 42px 24px; border-bottom: 1px solid var(--swagger-line); }
+.swagger-eyebrow { margin: 0 0 12px; color: var(--swagger-muted); font-size: 10px; font-weight: 650; letter-spacing: 1.5px; }
+.swagger-introduction h1 { margin: 0 0 16px; color: var(--swagger-ink); font-size: clamp(34px, 3.6vw, 48px); line-height: 1.1; font-weight: 600; letter-spacing: -1.8px; }
+.swagger-introduction h1 em { color: var(--swagger-green); font-family: Georgia, serif; font-weight: 400; }
+.swagger-introduction > p:not(.swagger-eyebrow) { max-width: 940px; margin: 0; color: var(--swagger-muted); font-size: 13px; line-height: 1.8; }
+.swagger-introduction strong { color: var(--swagger-ink); font-weight: 600; }
+.swagger-introduction code { padding: 2px 5px; border-radius: 4px; background: var(--swagger-soft); color: var(--swagger-green); font-size: .92em; overflow-wrap: anywhere; }
+.swagger-auth-help { margin-top: 22px; border: 1px solid var(--swagger-line); border-radius: 10px; background: var(--swagger-surface); }
+.swagger-auth-help summary { padding: 15px 18px; color: var(--swagger-green); font-size: 13px; font-weight: 600; cursor: pointer; }
+.swagger-auth-help > div { padding: 0 18px 16px; }
+.swagger-auth-help p { margin: 0 0 12px; color: var(--swagger-muted); font-size: 12px; line-height: 1.85; }
+.swagger-auth-help p:last-child { margin-bottom: 0; }
+.swagger-introduction > .swagger-prototype-note { margin-top: 18px; font-size: 11px; }
+.swagger-status { padding: 20px; border: 1px solid var(--swagger-line); border-radius: 10px; background: var(--swagger-surface); color: var(--swagger-ink); font-size: 14px; line-height: 1.7; }
+.swagger-skip-link { position: fixed; z-index: 100; top: 10px; left: 10px; transform: translateY(-150%); padding: 12px 18px; border-radius: 8px; background: var(--swagger-green); color: var(--swagger-page); font-size: 14px; font-weight: 600; }
+.swagger-skip-link:focus { transform: translateY(0); }
+
+/* Swagger supplies its own light/dark component styles; these keep the page chrome consistent. */
+.swagger-ui { background: transparent; }
+html.dark-mode .swagger-ui { background: transparent; }
+.swagger-ui .wrapper { max-width: none; padding-inline: 0; }
+.swagger-ui .info { margin-block: 28px; }
+.swagger-ui .info .title { font-size: clamp(25px, 3vw, 34px); }
+.swagger-ui .scheme-container, html.dark-mode .swagger-ui .scheme-container { padding: 18px; border: 1px solid var(--swagger-line); border-radius: 10px; background: var(--swagger-surface); box-shadow: none; }
+.swagger-ui .opblock.opblock-get .opblock-summary-method, .swagger-ui .opblock.opblock-post .opblock-summary-method, .swagger-ui .opblock.opblock-patch .opblock-summary-method, .swagger-ui .opblock.opblock-delete .opblock-summary-method { color: #101c13; text-shadow: none; }
+.swagger-ui .opblock-summary-path { overflow-wrap: anywhere; }
+.swagger-ui .btn { min-height: 36px; }
+.swagger-ui .btn.execute, html.dark-mode .swagger-ui .btn.execute { border-color: var(--swagger-action); background: var(--swagger-action); color: var(--swagger-action-ink); }
+.swagger-ui .btn.authorize, html.dark-mode .swagger-ui .btn.authorize { border-color: var(--swagger-green); color: var(--swagger-green); }
+.swagger-ui .btn.authorize svg, html.dark-mode .swagger-ui .btn.authorize svg { color: currentColor; }
+.swagger-ui .btn.cancel, html.dark-mode .swagger-ui .btn.cancel { border-color: light-dark(#b13838, #f3ada7); color: light-dark(#b13838, #f3ada7); }
+.swagger-ui .btn:focus-visible, .swagger-ui a:focus-visible, .swagger-ui button:focus-visible { outline: 3px solid var(--swagger-focus); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .swagger-page { padding-inline: 24px; }
+  .swagger-header { align-items: flex-start; flex-direction: column; gap: 14px; padding-block: 22px 16px; }
+  .swagger-navigation { justify-content: flex-start; gap: 5px 18px; }
+  .swagger-introduction { padding-top: 28px; }
+  .swagger-ui .opblock .opblock-summary { flex-wrap: wrap; }
+  .swagger-ui .opblock .opblock-summary-control { min-width: 0; }
+  .swagger-ui .opblock-summary-path { max-width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .swagger-page { padding-inline: 18px; }
+  .swagger-brand { font-size: 22px; }
+  .swagger-navigation { font-size: 11px; }
+  .swagger-back-link { padding-inline: 10px; }
+  .swagger-auth-help summary { padding-inline: 14px; }
+  .swagger-auth-help > div { padding-inline: 14px; }
+}

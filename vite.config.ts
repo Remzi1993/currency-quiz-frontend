@@ -1,4 +1,5 @@
 import vue from '@vitejs/plugin-vue'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 
 // https://vite.dev/config/
@@ -7,7 +8,16 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [vue()],
-    build: { target: 'esnext', modulePreload: { polyfill: false } },
+    build: {
+      target: 'esnext',
+      modulePreload: { polyfill: false },
+      rolldownOptions: {
+        input: {
+          app: fileURLToPath(new URL('./index.html', import.meta.url)),
+          swagger: fileURLToPath(new URL('./swagger/index.html', import.meta.url)),
+        },
+      },
+    },
     server: {
       proxy: {
         '/api': {

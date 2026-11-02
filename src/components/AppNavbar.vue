@@ -53,7 +53,7 @@ onUnmounted(() => {
     <div class="navbar-brand">
       <RouterLink to="/" class="navbar-item brand" aria-label="Currency Quiz home" @click="closeMenu()">
         <img class="brand-mark" :src="brandIconUrl" width="40" height="40" alt="" />
-        <span>Currency <span class="brand-light">quiz</span></span>
+        <span>Currency <span class="brand-light">Quiz</span></span>
       </RouterLink>
       <ThemeSelector ref="themeSelector" class="navbar-theme-selector" @open="closeMenu()" />
       <button

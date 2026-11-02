@@ -53,13 +53,20 @@ Sign-out revokes the family before clearing local state; a failed sign-out displ
 
 ## Run locally
 
-Use Node.js 26 and npm. Initialize the contract submodule before installing dependencies.
+Use Node.js 26 and npm. Clone the project together with its contract submodule, then install dependencies.
 
 **PowerShell 7+ and Linux/Bash:**
 
 ```sh
-git submodule update --init --recursive
+git clone --recurse-submodules https://github.com/Remzi1993/currency-quiz-frontend.git
+cd currency-quiz-frontend
 npm install
+```
+
+If you already cloned without `--recurse-submodules`, run this from the frontend project root before `npm install`. This command also works in **PowerShell 7+ and Linux/Bash**:
+
+```sh
+git submodule update --init
 ```
 
 Copy the example configuration if you need to change the backend address.
@@ -87,6 +94,34 @@ npm run dev
 Open the local URL printed by Vite, normally `http://localhost:5173`. Vite forwards `/api` to `http://localhost:8080`. Set the backend's `ADMIN_CORS_ALLOWED_ORIGINS=http://localhost:5173`, `AUTH_COOKIE_SECURE=false` for local HTTP only, and keep `AUTH_COOKIE_SAME_SITE=Strict`. POST requests retain Origin through the proxy. `localhost` and `127.0.0.1` are different origins; allow the exact address Vite prints. Keep `VITE_API_BASE_URL` empty.
 
 The frontend displays loading, empty, and connection-error states, with a retry action. Answer errors preserve your selection and progress; rate-limit responses pause submission according to `Retry-After`.
+
+### Update the shared API contract
+
+After pulling frontend changes, rerun `git submodule update --init` to check out the shared revision recorded by this repository. That command does not select the latest remote contract.
+
+To deliberately adopt the latest published contract, first commit and push any contract changes in the shared repository. Then run the following from the **frontend project root** in **PowerShell 7+ and Linux/Bash**. Keep any local work inside `shared/` committed before updating.
+
+```sh
+git submodule sync --recursive
+git submodule update --init --remote -- shared
+git diff --submodule=log -- shared
+npm ci
+npm run typecheck
+npm test
+npm run build
+```
+
+`sync` copies the repository URLs from `.gitmodules` into the local Git configuration. `--remote` fetches the shared repository and checks out the latest commit on its configured remote branch. Review the displayed contract commits and resolve any compatibility failures before recording the update. The frontend consumes the committed TypeScript declarations; no contract generation is needed here. See [Git's submodule documentation](https://git-scm.com/docs/git-submodule).
+
+Once the review and checks pass, save the new shared commit in the frontend repository. These commands also work in **PowerShell 7+ and Linux/Bash**:
+
+```sh
+git add shared
+git commit -m "Update shared API contract"
+git push
+```
+
+The backend has its own submodule pin, so update it separately using its README procedure.
 
 ## Backend configuration
 

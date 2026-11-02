@@ -95,27 +95,26 @@ const repositories = [
   margin-block: 42px 24px;
   padding: 48px 44px 24px;
   border-radius: 20px;
-  background: #183e31;
+  background: light-dark(#183e31, #12291f);
   color: #c0d0bd;
 }
-
 .project-footer .eyebrow { color: #b6cba5; font-size: 9px; letter-spacing: 1.4px; }
 .project-footer a { color: #e0edce; }
 .project-footer a:hover { color: #fffefa; text-decoration: underline; text-underline-offset: 4px; }
 .project-footer a:focus-visible { outline-color: #c0db9f; }
 .footer-introduction { display: flex; align-items: flex-start; justify-content: space-between; gap: 36px; }
 .footer-introduction h2 { margin-top: 18px; color: #fffefa; font-size: clamp(36px, 4vw, 54px); font-weight: 500; line-height: 1.15; letter-spacing: -1.8px; }
-.footer-introduction h2 em { color: #d4e5b9; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
+.footer-introduction h2 em { color: #d4e5b9; font-family: Georgia, Times New Roman, serif; font-weight: 400; }
 .footer-description { max-width: 580px; margin-top: 22px; font-size: 14px; line-height: 1.9; }
-.footer-license { display: flex; flex: none; align-items: center; gap: 12px; margin-top: 8px; padding: 16px 20px; border: 1px solid #678064; border-radius: 12px; background: #254b3b; }
+.footer-license { display: flex; flex: none; align-items: center; gap: 12px; margin-top: 8px; padding: 16px 20px; border: 1px solid #678064; border-radius: 12px; background: light-dark(#254b3b, #1c3c2c); }
 .footer-license > .app-icon:first-child { width: 28px; height: 28px; color: #c7dda9; }
 .footer-license > .app-icon:last-child { width: 16px; height: 16px; margin-left: 12px; }
 .footer-license > span { color: #b6cba5; font-size: 8px; line-height: 1.6; letter-spacing: 1.3px; }
 .footer-license strong { display: block; color: #f4f7e9; font-size: 15px; font-weight: 500; letter-spacing: 0; }
 .footer-repositories { margin-top: 44px; }
 .repository-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
-.repository-card { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 24px; border: 1px solid #47634f; border-radius: 12px; background: #204536; }
-.repository-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: #32563f; color: #d0e3b5; }
+.repository-card { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 24px; border: 1px solid #47634f; border-radius: 12px; background: light-dark(#204536, #193526); }
+.repository-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: light-dark(#32563f, #2b4934); color: #d0e3b5; }
 .repository-icon .app-icon { width: 19px; height: 19px; }
 .repository-card h4 { margin-top: 20px; color: #f4f6e9; font-size: 18px; font-weight: 600; letter-spacing: -.4px; }
 .repository-card p { margin-block: 12px 24px; font-size: 12px; line-height: 1.9; }
@@ -138,14 +137,12 @@ const repositories = [
 .footer-bottom nav { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; }
 .footer-bottom nav a { display: inline-flex; align-items: center; gap: 5px; }
 .footer-bottom .app-icon { width: 12px; height: 12px; }
-
 @media (max-width: 1100px) {
   .project-footer.footer { padding-inline: 30px; }
   .repository-card { padding: 20px; }
   .footer-details { gap: 36px; }
   .footer-bottom { align-items: flex-start; flex-direction: column; gap: 14px; }
 }
-
 @media (max-width: 800px) {
   .project-footer.footer { margin-top: 28px; padding: 32px 24px 24px; border-radius: 15px; }
   .footer-introduction { flex-direction: column; gap: 24px; }
@@ -160,7 +157,6 @@ const repositories = [
   .footer-bottom nav { align-items: flex-start; flex-direction: column; gap: 12px; }
   .footer-bottom nav a { min-height: 32px; }
 }
-
 @media (max-width: 440px) {
   .project-footer.footer { padding-inline: 20px; }
   .footer-introduction h2 { font-size: 34px; letter-spacing: -1.4px; }

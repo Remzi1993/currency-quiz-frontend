@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'arrow' | 'check' | 'close' | 'globe' | 'spark' | 'refresh' | 'info' | 'flag' | 'book' | 'pencil' | 'trash' | 'plus' | 'lock' | 'logout' | 'search' }>()
+defineProps<{ name: 'arrow' | 'check' | 'close' | 'globe' | 'spark' | 'refresh' | 'info' | 'flag' | 'book' | 'pencil' | 'trash' | 'plus' | 'lock' | 'logout' | 'search' | 'sun' | 'moon' | 'desktop' }>()
 
 const paths = {
   arrow: 'M5 12h14m-6-6 6 6-6 6',
@@ -17,12 +17,16 @@ const paths = {
   lock: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5V10Zm7 4v3',
   logout: 'M9 4H4v16h5M12 12h9m-4-4 4 4-4 4',
   search: 'm16 16 5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
+  sun: 'M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M21 12.8A9 9 0 0 1 11.2 3a9 9 0 1 0 9.8 9.8Z',
+  desktop: 'M3 4h18v13H3V4Zm9 13v4m-4 0h8',
 }
 </script>
 
 <template>
   <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <circle v-if="name === 'globe' || name === 'info'" cx="12" cy="12" r="10" />
+    <circle v-if="name === 'sun'" cx="12" cy="12" r="4" />
     <path :d="paths[name]" />
   </svg>
 </template>

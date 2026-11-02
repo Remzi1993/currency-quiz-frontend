@@ -1,3 +1,7 @@
+[build]
+command = "npm run build"
+publish = "dist"
+
 [[headers]]
 for = "/*"
 [headers.values]
@@ -5,6 +9,13 @@ Strict-Transport-Security = '''
     max-age=63072000;
     includeSubDomains;
     preload'''
+
+# Same-origin API proxy keeps admin cookies first-party in the browser.
+[[redirects]]
+from = "/api/*"
+to = "https://currencyquiz-backend.onrender.com/api/:splat"
+status = 200
+force = true
 
 # Pages
 [[redirects]]

@@ -186,47 +186,48 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.question-editor.box { position: fixed; width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 32px; overflow-y: auto; border: 1px solid #d4ddc9; border-radius: 15px; background: #fffefa; color: var(--ink); box-shadow: 0 20px 80px #122b2826; }
+.question-editor.box { position: fixed; width: min(680px, 100vw - 32px); max-height: calc(100dvh - 32px); margin: auto; padding: 32px; overflow-y: auto; border: 1px solid light-dark(#d4ddc9, #3b4b40); border-radius: 15px; background: light-dark(#fffefa, #19251f); color: var(--ink); box-shadow: 0 20px 80px light-dark(#122b2826, #00000059); }
 .question-editor:not([open]) { display: none; }
-.question-editor::backdrop { background: #142f2a66; backdrop-filter: blur(4px); }
+.question-editor::backdrop { background: light-dark(#142f2a66, #060b08bf); backdrop-filter: blur(4px); color-scheme: light dark; }
 .editor-close { position: absolute; top: 20px; right: 20px; }
 .question-editor > .eyebrow { padding-right: 24px; margin-bottom: 10px; }
 .question-editor > .panel-title { margin-bottom: 10px; }
 .editor-description { max-width: 520px; margin-bottom: 25px; color: var(--muted); font-size: 13px; line-height: 1.8; }
 .editor-fields, .editor-options { min-width: 0; padding: 0; border: 0; }
 .question-editor .label { margin-bottom: 9px; color: var(--ink); font-size: 13px; font-weight: 600; }
-.question-editor .input, .question-editor .textarea { border-color: #d9e1d0; background: #fffefa; color: var(--ink); box-shadow: none; font-size: 14px; }
+.question-editor .input, .question-editor .textarea { border-color: light-dark(#d9e1d0, #60745b); background: light-dark(#fffefa, #152019); color: var(--ink); box-shadow: none; font-size: 14px; }
+.question-editor .input::placeholder, .question-editor .textarea::placeholder { color: light-dark(#7b886f, #a0af9a); opacity: 1; }
 .question-editor .input:focus, .question-editor .textarea:focus { border-color: var(--green); }
-.question-editor [aria-invalid='true'] { border-color: #aa6745; }
+.question-editor [aria-invalid="true"] { border-color: light-dark(#aa6745, #d79773); }
 .editor-helper { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .editor-options { margin-top: 24px; }
 .editor-options legend { width: 100%; }
 .editor-options legend > span { float: right; color: var(--muted); font-size: 11px; font-weight: 400; }
 .editor-options > .editor-helper:first-of-type { margin: 0 0 14px; }
-.editor-answer-note { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 15px; padding: 12px; border-radius: 8px; background: #f0f4e9; color: #56684c; font-size: 11px; line-height: 1.8; }
+.editor-answer-note { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 15px; padding: 12px; border-radius: 8px; background: light-dark(#f0f4e9, #22332a); color: light-dark(#56684c, #bbceb0); font-size: 11px; line-height: 1.8; }
 .editor-answer-note .app-icon { width: 17px; height: 17px; margin-top: 2px; }
-.editor-keep-answer { display: flex; align-items: center; gap: 9px; min-height: 44px; margin-bottom: 10px; color: #435c35; font-size: 12px; cursor: pointer; }
+.editor-keep-answer { display: flex; align-items: center; gap: 9px; min-height: 44px; margin-bottom: 10px; color: light-dark(#435c35, #c6dbb7); font-size: 12px; cursor: pointer; }
 .editor-option-list { display: grid; gap: 11px; }
-.editor-option-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 9px 12px; padding: 13px; border: 1px solid #dfe5d6; border-radius: 9px; }
-.editor-option-row.is-correct { border-color: #7b9565; background: #f5f8ef; }
+.editor-option-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 9px 12px; padding: 13px; border: 1px solid light-dark(#dfe5d6, #3b4b40); border-radius: 9px; }
+.editor-option-row.is-correct { border-color: light-dark(#7b9565, #8da976); background: light-dark(#f5f8ef, #293b29); }
 .editor-option-input { min-width: 0; }
-.editor-option-input > label { display: block; margin-bottom: 7px; color: #65765b; font-size: 11px; font-weight: 600; }
-.editor-correct-choice { display: flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 19px; color: #53694a; font-size: 12px; cursor: pointer; }
+.editor-option-input > label { display: block; margin-bottom: 7px; color: light-dark(#65765b, #b6c7ab); font-size: 11px; font-weight: 600; }
+.editor-correct-choice { display: flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 19px; color: light-dark(#53694a, #bfd3b3); font-size: 12px; cursor: pointer; }
 .editor-correct-choice input, .editor-keep-answer input { flex: none; width: 16px; height: 16px; accent-color: var(--green); }
 .editor-remove { width: 44px; height: 44px; margin-top: 19px; padding: 0; }
 .editor-remove .app-icon { width: 17px; height: 17px; }
 .editor-option-row > .editor-field-error { grid-column: 1 / -1; margin: 0; }
-.editor-field-error { margin-top: 9px; color: #9b5c37; font-size: 11px; line-height: 1.7; }
+.editor-field-error { margin-top: 9px; color: light-dark(#9b5c37, #f0b697); font-size: 11px; line-height: 1.7; }
 .editor-add { min-height: 44px; margin-top: 13px; font-size: 12px; }
 .editor-add .app-icon { width: 16px; height: 16px; }
 .editor-save-note { margin-top: 24px; color: var(--muted); font-size: 12px; line-height: 1.8; }
-.editor-request-error { margin-block: 22px 0; padding: 14px; border-radius: 8px; background: #fcf2e8; color: #955a37; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.editor-request-error { margin-block: 22px 0; padding: 14px; border-radius: 8px; background: light-dark(#fcf2e8, #3b2921); color: light-dark(#955a37, #f0b697); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
 .editor-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 25px; padding-top: 22px; border-top: 1px solid var(--line); }
 .editor-actions .button { min-height: 46px; height: auto; font-size: 13px; }
-.editor-actions .button.is-primary { border-color: var(--green); background: var(--green); color: #fffefa; }
+.editor-actions .button.is-primary { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-ink); }
+.editor-actions .button.is-primary:hover { background: var(--action-hover-bg); color: var(--action-ink); }
 .editor-actions .app-icon { width: 17px; height: 17px; }
 .editor-fields:disabled .editor-correct-choice, .editor-fields:disabled .editor-keep-answer { cursor: default; }
-
 @media (max-width: 480px) {
   .question-editor.box { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); padding: 26px 18px 22px; }
   .editor-option-row { grid-template-columns: minmax(0, 1fr) 44px; gap: 5px 8px; padding: 11px; }

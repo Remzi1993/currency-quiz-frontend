@@ -15,6 +15,8 @@ function focusMain() {
 watch(() => route.name, async (name, previous) => {
   document.title = name === 'documentation'
     ? 'API Documentation · Currency Quiz'
+    : name === 'admin-login' ? 'Admin sign in · Currency Quiz'
+    : name === 'admin' ? 'Question administration · Currency Quiz'
     : name === 'not-found' ? 'Page not found · Currency Quiz' : 'Currency Quiz'
   if (previous === undefined) return
   await nextTick()

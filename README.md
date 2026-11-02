@@ -3,7 +3,7 @@
 
 A public quiz frontend for `currency-quiz-backend`, built with Vue 3, TypeScript 6, Vite 8, and Bulma 1. Bulma's precompiled CSS provides the layout, controls, and components; no Sass compiler or CSS framework JavaScript is needed. The API client uses native `fetch` and imports named model types from the API contract in `shared/`.
 
-Choose 10, 20, or all available questions and play a shuffled round. Each answer is checked once by the backend. The frontend shows feedback, question progress, correct and incorrect totals, a final score, and a review of your submitted answers. The public API returns correctness only, so an incorrect answer does not reveal the correct option. No account or admin interface is included.
+Choose 10, 20, or all available questions and play a shuffled round. Each answer is checked once by the backend. The frontend shows feedback, question progress, correct and incorrect totals, a final score, and a review of your submitted answers. The public API returns correctness only, so an incorrect answer does not reveal the correct option. Playing needs no account; the separate admin area manages the question bank.
 
 Your preferred round size and current or completed round are saved automatically in versioned `localStorage`. Refreshing restores the same question order, position, selection, checked feedback, score, and rate-limit deadline before requesting new questions. Leaving a round or choosing another round clears that session while keeping your preferred round size; the welcome screen loads the current question bank. Invalid saved data is ignored, and unavailable browser storage falls back to an in-memory session. No credentials are stored.
 
@@ -13,11 +13,21 @@ Use the navigation to switch between the quiz at `/` and the documentation at `/
 
 The documentation follows the OpenAPI contract in `shared/` and covers all seven operations: list, retrieve, create, update, and delete questions; check an answer; and obtain an admin token. It includes copyable request examples for JavaScript, PowerShell 7+, and Bash, example JSON, response statuses, authentication, and rate limits. Public quiz JavaScript examples work in the browser; authenticated examples are labelled Node.js and read `process.env.ADMIN_TOKEN`. Shared GET terminal commands are labelled for both shells, while requests with bodies have separate PowerShell and Bash examples. Public contract links lead to the [currency-quiz-shared repository](https://github.com/Remzi1993/currency-quiz-shared), and specification links open its [OpenAPI YAML on GitHub](https://github.com/Remzi1993/currency-quiz-shared/blob/main/openapi/currency-quiz.v1.yaml). The local shared contract still supplies generated client types; the website no longer bundles a separate YAML download.
 
-Reading the documentation needs no running backend. Its API base URL defaults to `VITE_API_BASE_URL`, or the frontend's origin when that setting is empty. Choosing another backend origin requires that backend to allow the frontend through CORS. Admin CRUD and login are documented with examples; the frontend does not collect admin credentials or provide live admin mutations.
+Reading the documentation needs no running backend. Its API base URL defaults to `VITE_API_BASE_URL`, or the frontend's origin when that setting is empty. Choosing another backend origin requires that backend to allow the frontend through CORS. Admin CRUD and login are documented with examples; the documentation explorer does not collect admin credentials or send admin mutations.
 
 The live explorer can list questions, retrieve one question, and check an answer against the editable API base URL. It displays the HTTP status, response body, and elapsed time, formatting JSON when possible and preserving other responses as text. Each button press sends one request with a 60-second timeout and no automatic retry. An actual HTTP `503` displays the Render startup explanation; other failures use ordinary error handling. The explorer never sends admin requests, and answer checks count towards the backend's submission rate limit.
 
 The shared footer introduces the school project and its author, Remzi Çavdar, with his website, email addresses, and student number. It links to the API contract, backend, and frontend repositories with short explanations, the OpenAPI specification, and the project's MIT license. Repository and specification destinations are centralized in `src/projectLinks.ts` so documentation and footer links stay consistent.
+
+## Question administration
+
+Choose **Admin** in the navbar or open `/admin/login`. Sign in with the backend's configured `ADMIN_USERNAME` and `ADMIN_PASSWORD`; no administrator credentials belong in frontend configuration or source code. `/admin` requires an active browser session and redirects to sign-in otherwise. The backend checks the bearer JWT on every write; frontend route guards provide navigation convenience and do not replace server authentication.
+
+The question bank lists all questions and supports searching question text, options, or UUIDs. Use **Create question**, the pencil button to edit, or the bin button to open a deletion confirmation. New questions appear at the end of the list, matching the backend's order, with a green confirmation. The table becomes a list of cards on small screens. Refresh fetches the latest bank without clearing an active search.
+
+Questions require 1–500 characters, 2–10 distinct answer options of 1–200 characters each, and a selected correct answer. Input is trimmed and options are compared without case. Existing correct answers are hidden by the API, including for authenticated list requests. Text-only edits can keep the stored answer; changing options requires choosing the correct answer again. Updates send only changed fields. Confirmed admin changes refresh the cached public bank when returning to the welcome screen, while active quiz rounds and results keep their saved question snapshot.
+
+The bearer token, username, and expiry are kept in this tab's `sessionStorage` under `currency-quiz.admin-session.v1`, with an in-memory fallback if storage is blocked. Passwords are never persisted by the application, and admin data does not enter the quiz's `localStorage`. Refreshing preserves an unexpired sign-in; sign-out, expiry, or an HTTP `401` clears it. Login honours `Retry-After` on HTTP `429`; only an actual HTTP `503` shows the Render startup explanation. Login and write requests are never retried automatically. If a write times out, check the refreshed list before retrying because the server may already have saved it.
 
 ## Run locally
 
@@ -84,7 +94,7 @@ npm run build
 npm run preview
 ```
 
-`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the API client, quiz state, saved-session handling, and documentation example serialization without a running backend. The `yaml` development dependency lets the documentation tests read the shared OpenAPI file and compare the documented operations, response codes, and authentication with the actual contract. It is not used in the browser bundle. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
+`typecheck` checks the Vue application, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the public and admin API clients, quiz state, saved-session handling, admin session expiry, question-form validation and partial updates, and documentation example serialization without a running backend. The `yaml` development dependency lets the documentation tests read the shared OpenAPI file and compare the documented operations, response codes, and authentication with the actual contract. It is not used in the browser bundle. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application in `dist/`; `preview` serves that build locally.
 
 Run these checks after updating the shared submodule. Its generated declarations now export named models such as `PublicQuestion` and `AnswerResponse`, without the former `components` or `paths` types. The frontend consumes these committed declarations and validates incoming JSON at runtime; no contract generation or Java installation is needed in this project. Endpoint metadata is maintained in the frontend and checked against the OpenAPI YAML by the tests. `npm run dev` transpiles TypeScript without typechecking, so a working development server alone does not confirm that a production build will pass.
 
@@ -94,7 +104,7 @@ Vue Router uses `createWebHistory(import.meta.env.BASE_URL)`. Opening `/index.ht
 
 The frontend host must serve `index.html` for frontend routes so a direct visit or refresh at `/documentation` or `/documentation/list-questions` can load the application. Vite's development server and `vite preview` provide this fallback locally; production hosting needs its own rewrite configuration.
 
-The root [netlify.toml](netlify.toml) configures Netlify to run `npm run build` with Node.js 26 and publish `dist/`. It rewrites `/`, `/documentation`, and `/documentation/:section` to `index.html` with HTTP `200`, then serves `index.html` with HTTP `404` for unmatched paths so Vue can show the not-found page. Existing static assets are served normally because these rewrites are not forced. The existing HSTS header is retained.
+For Netlify, configure the site's build command as `npm run build` and publish directory as `dist/`; `.nvmrc` selects Node.js 26. Vite copies [public/_redirects](public/_redirects) into the publish directory, where Netlify reads it directly. It rewrites `/`, `/documentation`, `/documentation/:section`, `/admin`, and `/admin/login` to `index.html` with HTTP `200`, then serves `index.html` with HTTP `404` for unmatched paths. Existing static assets are served normally because these rewrites are not forced. The existing `public/netlify.toml` is retained; using its header configuration requires Netlify to be explicitly configured to load that file rather than relying on its copy in `dist/`.
 
 For Netlify deployment, set `VITE_API_BASE_URL` in the build environment before building, or add a deliberate `/api` reverse-proxy rule before the page rewrites. The routing changes have been checked locally; a live Netlify deployment has not been verified.
 
@@ -109,13 +119,19 @@ For Netlify deployment, set `VITE_API_BASE_URL` in the build environment before 
 - `src/router.ts`: Vue Router history routes, the `/index.html` redirect, not-found handling, and navigation scroll behavior.
 - `src/views/QuizView.vue`: quiz screens and interaction with the session composable.
 - `src/views/ApiDocsView.vue`: API reference, code examples, contract links, and public request explorer.
+- `src/views/AdminLoginView.vue` and `src/views/AdminView.vue`: admin sign-in, searchable question bank, and create/edit/delete workflows.
+- `src/components/QuestionEditor.vue` and `src/admin/questionForm.ts`: accessible editor dialog, validation, and typed create/PATCH payloads.
+- `src/admin/admin.css`: shared admin-page styling layered over Bulma.
+- `src/composables/adminSession.ts`: tab-scoped bearer authentication, restoration, expiry, and sign-out.
+- `src/composables/questionBankRevision.ts`: invalidate cached public question data after successful administration changes.
 - `src/views/NotFoundView.vue`: unmatched-route page with navigation back to the application.
 - `src/docs/apiReference.ts`: endpoint metadata and typed request/response examples, plus JavaScript and shell example builders.
 - `src/composables/useQuiz.ts`: session state, shuffling, submission, scoring, and retry handling.
 - `src/composables/quizStorage.ts`: versioned browser storage and saved-session validation.
 - `src/api/client.ts`: native `fetch` requests using generated model types, response validation, timeouts, and API errors.
+- `src/api/adminClient.ts`: authenticated administration requests, safe API errors, and runtime validation of login and question responses.
 - `src/style.css`: application styling layered over Bulma's CSS.
-- `netlify.toml`: production build settings, frontend route rewrites, HTTP 404 fallback, and HSTS response header for Netlify.
+- `public/_redirects`: Netlify frontend-route rewrites and HTTP 404 fallback, copied into `dist/` by Vite.
 - `shared/openapi/currency-quiz.v1.yaml`: API contract; `shared/generated/typescript/schema.d.ts` supplies the client types. Update the shared contract through its own repository rather than editing generated types.
 
 TypeScript uses `target: "ESNext"` and `lib: ["ESNext", "DOM", "DOM.Iterable"]` for the browser application. DOM libraries supply browser APIs such as `document` and `fetch`; they are needed alongside the latest JavaScript definitions. Vite also targets `esnext`, and the module-preload polyfill is disabled. The application assumes current browsers and adds no legacy-browser compatibility layer.

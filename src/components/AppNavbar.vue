@@ -75,6 +75,9 @@ onUnmounted(() => {
         <RouterLink to="/documentation" class="navbar-item navigation-link" :class="{ 'is-active': route.name === 'documentation' }" @click="closeMenu(true)">
           <AppIcon name="book" /><span>Documentation</span>
         </RouterLink>
+        <RouterLink to="/admin" class="navbar-item navigation-link" :class="{ 'is-active': route.name === 'admin' || route.name === 'admin-login' }" @click="closeMenu(true)">
+          <AppIcon name="lock" /><span>Admin</span>
+        </RouterLink>
       </div>
       <div class="navbar-end">
         <div class="navbar-item help-item">

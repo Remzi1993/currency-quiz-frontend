@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import CurrencyGlobe from '../components/CurrencyGlobe.vue'
 import { useQuiz } from '../composables/useQuiz.ts'
+import { questionBankRevision } from '../composables/questionBankRevision.ts'
 
 const {
   phase, questions, questionCount, currentQuestion, currentNumber, totalQuestions,
   selectedAnswer, answerResult, records, correctCount, incorrectCount, progress, error,
-  isSubmitting, isWakingUp, retryAt, initialize, load, start, submit, next, restart,
+  isSubmitting, isWakingUp, retryAt, initialize: initializeQuizState, load: loadQuizQuestions, start, submit, next, restart,
 } = useQuiz()
 
 defineOptions({ name: 'QuizView' })
@@ -25,6 +26,41 @@ const countChoices = computed(() => [
   { value: questions.value.length, label: 'All', description: `${questions.value.length} questions` },
 ])
 const resultTitle = computed(() => scorePercent.value === 100 ? 'A world-class round.' : scorePercent.value >= 70 ? 'You know your money.' : scorePercent.value >= 40 ? 'Your knowledge is growing.' : 'Every journey starts somewhere.')
+let isActive = false
+let bankLoadInProgress = false
+let observedBankRevision = 0
+
+function refreshChangedBank() {
+  if (!isActive || bankLoadInProgress || observedBankRevision === questionBankRevision.value) return
+  if (phase.value === 'welcome' || phase.value === 'empty' || phase.value === 'error') void load()
+}
+
+async function load() {
+  bankLoadInProgress = true
+  // Record attempts as well as successful reads; a failed refresh keeps its manual retry button.
+  observedBankRevision = questionBankRevision.value
+  try {
+    await loadQuizQuestions()
+  } finally {
+    bankLoadInProgress = false
+    refreshChangedBank()
+  }
+}
+
+async function initialize() {
+  bankLoadInProgress = true
+  const revisionAtStart = questionBankRevision.value
+  try {
+    await initializeQuizState()
+    // Restored rounds retain their snapshot; only a bank read observes the current revision.
+    if (phase.value === 'welcome' || phase.value === 'empty' || phase.value === 'error') {
+      observedBankRevision = revisionAtStart
+    }
+  } finally {
+    bankLoadInProgress = false
+    refreshChangedBank()
+  }
+}
 
 function leaveQuiz() {
   exitDialog.value?.close()
@@ -58,6 +94,14 @@ watch(retryAt, (deadline, _previous, onCleanup) => {
   onCleanup(() => window.clearInterval(timer))
 })
 
+watch([phase, questionBankRevision], refreshChangedBank)
+
+onActivated(() => {
+  isActive = true
+  refreshChangedBank()
+})
+onDeactivated(() => { isActive = false })
+onBeforeUnmount(() => { isActive = false })
 onMounted(initialize)
 </script>
 

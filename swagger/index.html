@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f6f7f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111b17" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="Explore and try the Currency Quiz API using Swagger UI and the shared OpenAPI contract." />
+    <script src="/theme-init.js"></script>
+    <title>Swagger UI · Currency Quiz</title>
+  </head>
+  <body>
+    <a class="swagger-skip-link" href="#swagger-main">Skip to API reference</a>
+    <div class="swagger-page">
+      <header class="swagger-header">
+        <a class="swagger-brand" href="../" aria-label="Currency Quiz home">
+          <img src="/favicon.svg" width="40" height="40" alt="" />
+          <span>Currency <span class="swagger-brand-light">quiz</span></span>
+        </a>
+        <nav class="swagger-navigation" aria-label="Documentation navigation">
+          <a class="swagger-back-link" href="../documentation">Back to documentation <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/Remzi1993/currency-quiz-shared" target="_blank" rel="noopener">API contract</a>
+          <a href="https://github.com/Remzi1993/currency-quiz-shared/blob/main/openapi/currency-quiz.v1.yaml" target="_blank" rel="noopener">OpenAPI YAML</a>
+        </nav>
+      </header>
+
+      <section class="swagger-introduction" aria-labelledby="swagger-heading">
+        <p class="swagger-eyebrow">EXPLORE THE CONTRACT</p>
+        <h1 id="swagger-heading">Swagger <em>UI.</em></h1>
+        <p>Browse the Currency Quiz API and use <strong>Try it out</strong> to send a request through this website’s <code>/api</code> proxy. Requests run only when you choose <strong>Execute</strong>; admin changes affect the question bank.</p>
+        <details class="swagger-auth-help">
+          <summary>Admin authentication</summary>
+          <div>
+            <p>Sign in through the <a href="../admin">admin workspace</a> or execute <code>POST /api/v1/auth/session</code> below. The browser manages the HttpOnly access and refresh cookies.</p>
+            <p>Execute <code>GET /api/v1/auth/session</code>, then enter its <code>csrfToken</code> under <strong>Authorize → adminCsrf</strong> before cookie-authenticated writes. Do not paste cookie values into Swagger UI. The browser supplies <code>Origin</code> and <code>Cookie</code>; an Origin field shown in an operation does not override the browser’s value. This page’s origin is <code id="swagger-origin">the address in your browser</code>.</p>
+            <p>Bearer API clients can obtain a token through <code>POST /api/v1/auth/login</code> and use <strong>adminBearer</strong>. Authorization values stay in memory and clear on reload. Access lasts at most 5 minutes, inactivity at most 15 minutes, and a browser session at most 30 minutes. Swagger UI does not renew sessions or record activity automatically; refresh and sign-out are explicit requests.</p>
+          </div>
+        </details>
+        <p class="swagger-prototype-note">Experimental school project · Render’s Free plan may need up to one minute to start the service. If an executed request returns <strong>503</strong>, wait and retry manually.</p>
+      </section>
+
+      <main id="swagger-main" tabindex="-1">
+        <p id="swagger-status" class="swagger-status" role="status">Loading the OpenAPI reference…</p>
+        <noscript><p class="swagger-status">Enable JavaScript to use Swagger UI. You can also read the <a href="https://github.com/Remzi1993/currency-quiz-shared/blob/main/openapi/currency-quiz.v1.yaml">OpenAPI specification on GitHub</a>.</p></noscript>
+        <div id="swagger-ui"></div>
+      </main>
+    </div>
+    <script type="module" src="/src/swagger/main.ts"></script>
+  </body>
+</html>

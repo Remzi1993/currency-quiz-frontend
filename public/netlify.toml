@@ -19,6 +19,16 @@ force = true
 
 # Pages
 [[redirects]]
+from = "/swagger"
+to = "/swagger/"
+status = 301
+
+[[redirects]]
+from = "/swagger/"
+to = "/swagger/index.html"
+status = 200
+
+[[redirects]]
 from = "/"
 to = "/index.html"
 status = 200

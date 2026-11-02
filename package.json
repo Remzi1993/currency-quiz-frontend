@@ -10,16 +10,18 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "typecheck": "vue-tsc -b && tsc -p tsconfig.test.json",
-    "test": "node --test src/api/client.test.ts src/api/adminClient.test.ts src/composables/useQuiz.test.ts src/composables/useTheme.test.ts src/composables/quizStorage.test.ts src/composables/adminSession.test.ts src/admin/questionForm.test.ts src/docs/apiReference.test.ts",
+    "test": "node --test src/api/client.test.ts src/api/adminClient.test.ts src/composables/useQuiz.test.ts src/composables/useTheme.test.ts src/composables/quizStorage.test.ts src/composables/adminSession.test.ts src/admin/questionForm.test.ts src/docs/apiReference.test.ts src/swagger/requests.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
     "bulma": "^1.0.4",
+    "swagger-ui": "^5.34.1",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/swagger-ui": "^5.32.1",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/tsconfig": "^0.9.1",
     "typescript": "npm:typescript-native-bridge@6.0.3-bridge.19.tsgo.7.0.2",
@@ -28,6 +30,13 @@
     "yaml": "^2.9.1"
   },
   "overrides": {
+    "swagger-ui": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    },
+    "@swagger-api/apidom-reference": {
+      "minimatch": "^11.0.4"
+    },
     "typescript": "$typescript"
   }
 }

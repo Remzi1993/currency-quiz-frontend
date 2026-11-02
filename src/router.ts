@@ -34,8 +34,13 @@ export const router = createRouter({
   },
 })
 
-router.beforeEach((to) => {
-  const token = adminSession.getToken()
-  if (to.meta.requiresAdmin && !token) return { name: 'admin-login' }
-  if (to.name === 'admin-login' && token) return { name: 'admin' }
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAdmin && to.name !== 'admin-login') return
+  try { await adminSession.restore() } catch {
+    // Public navigation remains independent of backend availability; login exposes a retry.
+    if (to.meta.requiresAdmin) return { name: 'admin-login' }
+  }
+  const authenticated = adminSession.getCsrfToken() !== null
+  if (to.meta.requiresAdmin && !authenticated) return { name: 'admin-login' }
+  if (to.name === 'admin-login' && authenticated) return { name: 'admin' }
 })

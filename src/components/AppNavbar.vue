@@ -2,12 +2,14 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppIcon from './AppIcon.vue'
+import ThemeSelector from './ThemeSelector.vue'
 
 const emit = defineEmits<{ showHelp: [] }>()
 const route = useRoute()
 const brandIconUrl = `${import.meta.env.BASE_URL}favicon.svg`
 const navbar = ref<HTMLElement | null>(null)
 const burger = ref<HTMLButtonElement | null>(null)
+const themeSelector = ref<InstanceType<typeof ThemeSelector> | null>(null)
 const menuOpen = ref(false)
 let desktop: MediaQueryList | undefined
 
@@ -29,7 +31,10 @@ function showHelp() {
   emit('showHelp')
 }
 
-watch(() => route.fullPath, () => closeMenu())
+watch(() => route.fullPath, () => {
+  closeMenu()
+  themeSelector.value?.close()
+})
 
 onMounted(() => {
   document.addEventListener('pointerdown', onPointerDown)
@@ -50,6 +55,7 @@ onUnmounted(() => {
         <img class="brand-mark" :src="brandIconUrl" width="40" height="40" alt="" />
         <span>Currency <span class="brand-light">quiz</span></span>
       </RouterLink>
+      <ThemeSelector ref="themeSelector" class="navbar-theme-selector" @open="closeMenu()" />
       <button
         ref="burger"
         class="navbar-burger"
@@ -58,7 +64,7 @@ onUnmounted(() => {
         :aria-label="menuOpen ? 'Close navigation' : 'Open navigation'"
         :aria-expanded="menuOpen"
         aria-controls="main-navigation-menu"
-        @click="menuOpen = !menuOpen"
+        @click="() => { themeSelector?.close(); menuOpen = !menuOpen }"
       >
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
@@ -92,24 +98,23 @@ onUnmounted(() => {
 
 <style scoped>
 .app-navbar {
-  --bulma-navbar-background-color: #f6f7f2;
+  --bulma-navbar-background-color: light-dark(#f6f7f2, #111b17);
   --bulma-navbar-burger-color: var(--green);
   --bulma-navbar-item-color: var(--green);
   --bulma-navbar-item-img-max-height: none;
   min-height: 104px;
-  gap: 36px;
+  gap: 24px;
   border-bottom: 1px solid var(--line);
   background: var(--bulma-navbar-background-color);
 }
-
 .app-navbar.has-shadow { box-shadow: none; }
-.navbar-brand { align-items: center; }
-.brand.navbar-item { padding: 0; background: transparent; color: var(--green); }
+.navbar-brand { display: contents; }
+.brand.navbar-item { padding: 0; background: none; color: var(--green); order: 1; align-self: center; }
 .brand-mark { display: block; flex: none; width: 40px; height: 40px; }
-.navbar-menu { align-items: center; gap: 24px; }
+.navbar-menu { align-items: center; gap: 24px; order: 2; }
+.navbar-theme-selector { order: 3; align-self: center; }
 .navbar-start { align-items: center; gap: 8px; margin-left: auto; margin-right: 0; }
 .navbar-end { align-items: center; margin-left: auto; }
-
 .navigation-link {
   display: flex;
   align-items: center;
@@ -122,13 +127,11 @@ onUnmounted(() => {
   font-weight: 600;
   transition: background .15s, color .15s;
 }
-
 .navigation-link .app-icon { width: 17px; height: 17px; }
-.navigation-link:hover { background: #edf1e6; color: var(--green); }
-.navigation-link.is-active { background: #e8eedf; color: var(--green); }
+.navigation-link:hover { background: light-dark(#edf1e6, #22332a); color: var(--green); }
+.navigation-link.is-active { background: light-dark(#e8eedf, #2d4434); color: var(--green); }
 .help-item { padding: 0; }
 .help-button { min-height: 44px; }
-
 @media (max-width: 1023px) {
   .app-navbar {
     min-height: var(--mobile-navbar-height);
@@ -137,13 +140,12 @@ onUnmounted(() => {
     border-bottom: 0;
     border-radius: 18px 18px 0 0;
   }
-
-  .app-navbar.has-shadow { box-shadow: 0 -4px 28px #24392e0d; }
-  .navbar-brand { min-height: calc(var(--mobile-navbar-height) - 1px); gap: 16px; }
-  .brand.navbar-item { font-size: 22px; gap: 10px; }
+  .app-navbar.has-shadow { box-shadow: 0 -4px 28px light-dark(#24392e0d, #00000040); }
+  .navbar-brand { min-height: calc(var(--mobile-navbar-height) - 1px); gap: 8px; display: flex; }
+  .brand.navbar-item { font-size: 22px; gap: 10px; order: initial; }
+  .navbar-theme-selector { order: initial; margin-left: auto; }
   .brand-mark { width: 34px; height: 34px; }
-  .navbar-burger { width: 44px; height: 44px; margin-right: 0; background: #e8eedf; border-radius: 10px; }
-
+  .navbar-burger { width: 44px; height: 44px; background: light-dark(#e8eedf, #2d4434); border-radius: 10px; margin-inline: 0; }
   .navbar-menu {
     position: absolute;
     bottom: 100%;
@@ -156,14 +158,17 @@ onUnmounted(() => {
     margin-bottom: 10px;
     border: 1px solid var(--line);
     border-radius: 14px;
-    background: #fffefa;
-    box-shadow: 0 -8px 36px #24392e14;
+    background: light-dark(#fffefa, #19251f);
+    box-shadow: 0 -8px 36px light-dark(#24392e14, #00000050);
   }
-
   .navbar-start { display: grid; gap: 5px; }
   .navigation-link { min-height: 50px; padding-inline: 15px; font-size: 14px; }
   .navigation-link .app-icon { width: 19px; height: 19px; }
   .navbar-end { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
   .help-button { justify-content: flex-start; width: 100%; min-height: 50px; padding-inline: 15px; font-size: 13px; }
+}
+@media (max-width: 380px) {
+  .brand.navbar-item { gap: 6px; font-size: 18px; }
+  .brand-mark { width: 32px; height: 32px; }
 }
 </style>

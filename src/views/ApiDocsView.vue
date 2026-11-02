@@ -203,7 +203,7 @@ onBeforeUnmount(clearRequest)
           </section>
 
           <div class="docs-endpoint-address"><span class="method-badge" :class="`method-${exampleEndpoint.method.toLowerCase()}`">{{ exampleEndpoint.method }}</span><code>{{ requestUrl }}</code><button class="button is-small is-ghost" type="button" aria-label="Copy endpoint URL" @click="copy(requestUrl, 'Endpoint URL')">Copy</button></div>
-          <div class="docs-access-note"><AppIcon :name="exampleEndpoint.auth ? 'flag' : 'check'" /><span>{{ exampleEndpoint.auth ? 'Requires an admin Bearer token.' : exampleEndpoint.id === 'login' ? 'Requires the backend administrator’s credentials.' : 'Public endpoint — no authentication required.' }}</span></div>
+          <div class="docs-access-note"><AppIcon :name="exampleEndpoint.auth ? 'flag' : 'check'" /><span>{{ exampleEndpoint.browserSession === 'create' || exampleEndpoint.id === 'login' ? 'Requires the backend administrator’s credentials.' : exampleEndpoint.browserSession ? 'Requires an HttpOnly admin cookie. Writes also require a CSRF token.' : exampleEndpoint.auth ? 'Requires an admin Bearer token or a cookie session with CSRF protection.' : 'Public endpoint — no authentication required.' }}</span></div>
 
           <section v-if="needsQuestionId" class="docs-section">
             <h3>Path parameter</h3>
@@ -225,6 +225,7 @@ onBeforeUnmount(clearRequest)
               </div>
               <p v-if="language === 'terminal'" class="docs-code-caption">Works in PowerShell 7+ and Linux/Bash.</p>
               <p v-else-if="language === 'powershell'" class="docs-code-caption">PowerShell 7+ · Invoke-RestMethod</p>
+              <p v-else-if="language === 'javascript' && exampleEndpoint.browserSession" class="docs-code-caption">Browser JavaScript · Use your trusted frontend origin. The browser manages the HttpOnly cookies.</p>
               <p v-else-if="language === 'javascript' && exampleEndpoint.auth" class="docs-code-caption">Node.js · Set ADMIN_TOKEN in your environment to the token returned by admin login.</p>
               <pre class="docs-code"><code>{{ exampleCode }}</code></pre>
             </div>
@@ -273,7 +274,7 @@ onBeforeUnmount(clearRequest)
             <pre class="docs-code docs-light-code"><code>{{ JSON.stringify({ code: 'validation_error', message: 'Request validation failed', details: ['An answer is required.'] }, null, 2) }}</code></pre>
             <p><strong>429 Too Many Requests:</strong> respect the <code>Retry-After</code> header (seconds). Answer checks allow 30 submissions per minute per client IP; login allows 5 attempts per minute per client IP.</p>
             <p><strong>503 Service Unavailable:</strong> this experimental school project uses Render’s Free plan. The backend may need up to a minute to wake after inactivity. Hosting responses may be HTML; only an actual HTTP 503 is treated as possible startup. Other failures need to be handled as errors.</p>
-            <p><strong>Browser access:</strong> the backend must allow your application’s origin through CORS. Use HTTPS outside local development.</p>
+            <p><strong>Browser access:</strong> public API CORS can allow all origins. Cookie-based admin access requires an exact <code>ADMIN_CORS_ALLOWED_ORIGINS</code> entry and CSRF protection on writes. Use HTTPS outside local development and the same-origin <code>/api</code> proxy on Netlify to keep admin cookies first-party.</p>
             <p>The <a :href="projectLinks.contract" target="_blank" rel="noopener">API contract repository</a> contains the <a :href="projectLinks.openApiSpec" target="_blank" rel="noopener">OpenAPI specification</a> defining all request fields, validation rules, and responses.</p>
           </section>
         </template>

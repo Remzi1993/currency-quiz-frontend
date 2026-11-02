@@ -3,5 +3,7 @@ import 'bulma/css/bulma.min.css'
 import './style.css'
 import App from './App.vue'
 import { router } from './router.ts'
+import { initializeTheme } from './composables/useTheme.ts'
 
+initializeTheme()
 createApp(App).use(router).mount('#app')

@@ -2,13 +2,15 @@
 .admin-page h1 { font-size: clamp(34px, 3.7vw, 49px); line-height: 1.15; letter-spacing: -1.7px; }
 .admin-description { margin-top: 16px; font-size: 13px; line-height: 1.8; color: var(--muted); }
 .admin-page .button { min-height: 44px; height: auto; padding: 10px 16px; font-size: 12px; }
-.admin-primary.button { border: 1px solid var(--green); background: var(--green); color: #fffefa; }
-.admin-primary.button:hover { background: #103d2e; color: #fffefa; }
-.admin-surface.box { padding: 30px; background: #fffefa; border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 12px 36px #253b3005; }
+.admin-primary.button { border: 1px solid var(--action-bg); background: var(--action-bg); color: var(--action-ink); }
+.admin-primary.button:hover { background: var(--action-hover-bg); color: var(--action-ink); }
+.admin-surface.box { padding: 30px; background: light-dark(#fffefa, #19251f); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 12px 36px light-dark(#253b3005, #00000026); }
 .admin-page .label { color: var(--ink); font-size: 12px; font-weight: 600; }
-.admin-page .input { min-height: 46px; border-color: #d8e1cc; border-radius: 8px; background: #fffefa; color: var(--ink); font-size: 13px; box-shadow: none; }
-.admin-notice.notification { border: 1px solid #d1dfc1; background: #eef5e6; color: #37582b; padding: 14px 16px; font-size: 12px; line-height: 1.8; }
-.admin-error.notification { padding: 14px 16px; background: #fff1e9; color: #8b4c31; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.admin-page .input { min-height: 46px; border-color: light-dark(#d8e1cc, #60745b); border-radius: 8px; background: light-dark(#fffefa, #152019); color: var(--ink); font-size: 13px; box-shadow: none; }
+.admin-page .input::placeholder { color: light-dark(#7b886f, #a0af9a); opacity: 1; }
+.admin-page .input:focus { border-color: var(--green); }
+.admin-notice.notification { border: 1px solid light-dark(#d1dfc1, #526b45); background: light-dark(#eef5e6, #253827); color: light-dark(#37582b, #c9e5b4); padding: 14px 16px; font-size: 12px; line-height: 1.8; }
+.admin-error.notification { padding: 14px 16px; background: light-dark(#fff1e9, #3b2921); color: light-dark(#8b4c31, #f0b697); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
 .admin-error .button { margin-top: 12px; }
 .admin-helper { margin-top: 12px; font-size: 11px; line-height: 1.8; color: var(--muted); }
 .admin-login-page { display: grid; grid-template-columns: 1.1fr 1fr; gap: 80px; align-items: center; padding-block: 70px; }
@@ -16,7 +18,7 @@
 .admin-login-intro > .eyebrow { margin-bottom: 25px; }
 .admin-login-intro h1 { font-size: clamp(42px, 4.2vw, 60px); }
 .admin-login-intro > p:not(.eyebrow) { margin-top: 25px; max-width: 410px; font-size: 14px; line-height: 1.9; color: var(--muted); }
-.admin-intro-note { display: flex; align-items: center; gap: 14px; margin-top: 32px; padding-block: 22px; border-block: 1px solid var(--line); color: #668156; font-size: 12px; line-height: 1.7; }
+.admin-intro-note { display: flex; align-items: center; gap: 14px; margin-top: 32px; padding-block: 22px; border-block: 1px solid var(--line); color: light-dark(#668156, #b4caa1); font-size: 12px; line-height: 1.7; }
 .admin-intro-note .app-icon { width: 25px; height: 25px; }
 .admin-back-link { display: inline-flex; gap: 10px; align-items: center; margin-top: 28px; font-size: 12px; color: var(--green); }
 .admin-login-card { width: 100%; max-width: 480px; justify-self: end; }
@@ -28,7 +30,7 @@
 .admin-login-form .field + .field { margin-top: 20px; }
 .admin-login-form > .button { margin-top: 22px; }
 .admin-login-form > .admin-error { margin-block: 18px 0; }
-.admin-session-note { margin-top: 24px; padding-top: 21px; border-top: 1px solid var(--line); font-size: 10px; line-height: 1.9; color: #7b886f; }
+.admin-session-note { margin-top: 24px; padding-top: 21px; border-top: 1px solid var(--line); font-size: 10px; line-height: 1.9; color: light-dark(#7b886f, #aab8a8); }
 .admin-topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 35px; }
 .admin-topbar .eyebrow { margin-bottom: 18px; }
 .admin-account { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex: none; }
@@ -37,37 +39,36 @@
 .admin-account .button { color: var(--green); }
 .admin-bank-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .admin-bank-heading h2 { display: flex; gap: 12px; align-items: center; color: var(--ink); font-size: 24px; font-weight: 600; letter-spacing: -.6px; }
-.admin-bank-heading h2 .tag { background: #eaf0e0; color: #577440; font-size: 12px; font-weight: 500; }
+.admin-bank-heading h2 .tag { background: light-dark(#eaf0e0, #2a3e2e); color: light-dark(#577440, #c0d6af); font-size: 12px; font-weight: 500; }
 .admin-bank-heading p { margin-top: 7px; color: var(--muted); font-size: 11px; }
 .admin-toolbar { display: flex; gap: 12px; align-items: center; padding-block: 24px; }
 .admin-search.field { flex: 1; margin-bottom: 0; }
 .admin-search .input { padding-left: 42px; }
-.admin-search .icon { height: 46px; color: #839573; }
+.admin-search .icon { height: 46px; color: light-dark(#839573, #b2c5a3); }
 .admin-search .app-icon { width: 18px; height: 18px; }
 .admin-loading, .admin-empty { padding: 30px 0; font-size: 13px; color: var(--muted); line-height: 1.9; }
-.admin-result-count { margin-bottom: 18px; color: #7c8972; font-size: 10px; }
-.admin-question-table.table { background: transparent; color: var(--ink); table-layout: fixed; }
-.admin-question-table th { color: #6a7b5c; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; border-color: var(--line); padding: 12px; }
+.admin-result-count { margin-bottom: 18px; color: light-dark(#7c8972, #aab8a8); font-size: 10px; }
+.admin-question-table.table { background: none; color: var(--ink); table-layout: fixed; }
+.admin-question-table th { color: light-dark(#6a7b5c, #b4c5a8); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; border-color: var(--line); padding: 12px; }
 .admin-question-table th:first-child { width: 44%; padding-left: 0; }
 .admin-question-table th.admin-actions-heading { width: 120px; text-align: right; }
-.admin-question-table td { padding: 22px 12px; border-color: #e5e9de; vertical-align: middle; }
+.admin-question-table td { padding: 22px 12px; border-color: light-dark(#e5e9de, #3b4b40); vertical-align: middle; }
 .admin-question-table .admin-question-text { padding-left: 0; }
-.admin-question-text strong { display: block; font-size: 13px; line-height: 1.8; color: #344b37; font-weight: 600; overflow-wrap: anywhere; }
-.admin-question-text code { display: block; margin-top: 9px; padding: 0; background: transparent; color: #7f8c76; font-size: 9px; overflow-wrap: anywhere; }
+.admin-question-text strong { display: block; font-size: 13px; line-height: 1.8; color: light-dark(#344b37, #d8e8d5); font-weight: 600; overflow-wrap: anywhere; }
+.admin-question-text code { display: block; margin-top: 9px; padding: 0; background: none; color: light-dark(#7f8c76, #aab8a8); font-size: 9px; overflow-wrap: anywhere; }
 .admin-question-options ul { display: flex; flex-wrap: wrap; gap: 6px; }
-.admin-question-options li { max-width: 100%; border-radius: 5px; padding: 5px 8px; background: #eff3e8; color: #536a44; font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+.admin-question-options li { max-width: 100%; border-radius: 5px; padding: 5px 8px; background: light-dark(#eff3e8, #2a3e2e); color: light-dark(#536a44, #c0d6af); font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
 .admin-question-actions > div { display: flex; gap: 8px; justify-content: flex-end; }
 .admin-page .admin-icon-button { min-width: 42px; min-height: 42px; padding: 9px; color: var(--green); }
-.admin-page .admin-delete-button { color: #9b6146; }
+.admin-page .admin-delete-button { color: light-dark(#9b6146, #f0b697); }
 .admin-icon-button .app-icon { width: 18px; height: 18px; }
-.admin-delete-dialog.box { position: fixed; width: min(490px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); overflow-y: auto; margin: auto; padding: 32px; border: 1px solid #dfd7cc; border-radius: 15px; background: #fffefa; color: var(--ink); }
+.admin-delete-dialog.box { position: fixed; width: min(490px, 100vw - 40px); max-height: calc(100dvh - 48px); overflow-y: auto; margin: auto; padding: 32px; border: 1px solid light-dark(#dfd7cc, #3b4b40); border-radius: 15px; background: light-dark(#fffefa, #19251f); color: var(--ink); }
 .admin-delete-dialog:not([open]) { display: none; }
-.admin-delete-dialog::backdrop { background: #142f2a66; backdrop-filter: blur(4px); }
+.admin-delete-dialog::backdrop { background: light-dark(#142f2a66, #060b08bf); backdrop-filter: blur(4px); color-scheme: light dark; }
 .admin-delete-dialog .eyebrow { margin-bottom: 12px; }
-.admin-delete-icon { background: #faeee5; color: #a16846; }
-.admin-delete-preview { padding: 18px; margin-block: 22px; border-radius: 8px; background: #f4f3ec; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.admin-delete-icon { background: light-dark(#faeee5, #3b2921); color: light-dark(#a16846, #f0b697); }
+.admin-delete-preview { padding: 18px; margin-block: 22px; border-radius: 8px; background: light-dark(#f4f3ec, #22332a); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
 .admin-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
-
 @media (max-width: 900px) {
   .admin-login-page { gap: 36px; }
   .admin-topbar { flex-direction: column; }

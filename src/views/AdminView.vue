@@ -26,10 +26,11 @@ const deletingQuestion = shallowRef<PublicQuestion | null>(null)
 const isDeleting = ref(false)
 const deleteError = ref('')
 const hasLoaded = ref(false)
+const isSigningOut = ref(false)
+const signOutError = ref('')
 let loadController: AbortController | undefined
 let writeController: AbortController | undefined
 let loadNumber = 0
-let signingOut = false
 let previousDeleteFocus: HTMLElement | null = null
 
 const filteredQuestions = computed(() => {
@@ -43,7 +44,7 @@ watch(adminSession.state, (session) => {
   if (!session) {
     cancelLoading()
     writeController?.abort()
-    void router.replace({ name: 'admin-login', query: { reason: signingOut ? 'signed-out' : 'expired' } })
+    void router.replace({ name: 'admin-login', query: { reason: isSigningOut.value ? 'signed-out' : 'expired' } })
   }
 }, { immediate: true })
 
@@ -56,7 +57,7 @@ function cancelLoading() {
 
 function handleError(cause: unknown): string {
   if (cause instanceof ApiError && cause.status === 401) {
-    adminSession.signOut()
+    adminSession.invalidate()
     return 'Your session ended. Please sign in again.'
   }
   return cause instanceof Error ? cause.message : 'The request could not be completed. Please try again.'
@@ -70,8 +71,7 @@ function writeError(cause: unknown): string {
 }
 
 async function loadQuestions() {
-  const token = adminSession.getToken()
-  if (!token) return
+  if (!adminSession.getCsrfToken()) return
   loadController?.abort()
   const active = new AbortController()
   loadController = active
@@ -79,7 +79,10 @@ async function loadQuestions() {
   isLoading.value = true
   loadError.value = ''
   try {
-    const result = await api.listQuestions(token, active.signal)
+    await adminSession.restore(true, active.signal)
+    if (current !== loadNumber || active.signal.aborted || !adminSession.getCsrfToken()) return
+    if (!await adminSession.ensureAccess(active.signal)) return
+    const result = await api.listQuestions(active.signal)
     if (current !== loadNumber || active.signal.aborted) return
     questions.value = result
     hasLoaded.value = true
@@ -110,17 +113,18 @@ function publicView(question: AdminQuestion): PublicQuestion {
 
 async function saveQuestion(submission: QuestionSubmission) {
   if (isSaving.value) return
-  const token = adminSession.getToken()
-  if (!token) return
+  if (!adminSession.getCsrfToken()) return
   cancelLoading()
   const active = new AbortController()
   writeController = active
   isSaving.value = true
   saveError.value = ''
   try {
+    const csrfToken = await adminSession.ensureAccess(active.signal)
+    if (!csrfToken || active.signal.aborted) return
     const result = submission.mode === 'create'
-      ? await api.createQuestion(token, submission.body, active.signal)
-      : await api.updateQuestion(token, submission.id, submission.body, active.signal)
+      ? await api.createQuestion(csrfToken, submission.body, active.signal)
+      : await api.updateQuestion(csrfToken, submission.id, submission.body, active.signal)
     if (active.signal.aborted) return
     const updated = publicView(result)
     questions.value = submission.mode === 'create'
@@ -162,8 +166,7 @@ function closeDeleteOnBackdrop(event: MouseEvent) {
 
 async function deleteQuestion() {
   if (isDeleting.value || !deletingQuestion.value) return
-  const token = adminSession.getToken()
-  if (!token) return
+  if (!adminSession.getCsrfToken()) return
   cancelLoading()
   const question = deletingQuestion.value
   const active = new AbortController()
@@ -171,7 +174,9 @@ async function deleteQuestion() {
   isDeleting.value = true
   deleteError.value = ''
   try {
-    await api.deleteQuestion(token, question.id, active.signal)
+    const csrfToken = await adminSession.ensureAccess(active.signal)
+    if (!csrfToken || active.signal.aborted) return
+    await api.deleteQuestion(csrfToken, question.id, active.signal)
     if (active.signal.aborted) return
     questions.value = questions.value.filter(({ id }) => id !== question.id)
     markQuestionBankChanged()
@@ -185,13 +190,26 @@ async function deleteQuestion() {
   }
 }
 
-function signOut() {
-  signingOut = true
-  adminSession.signOut()
+async function signOut() {
+  if (isSigningOut.value || isSaving.value || isDeleting.value) return
+  isSigningOut.value = true
+  signOutError.value = ''
+  try { await adminSession.signOut() } catch (cause) {
+    signOutError.value = `${cause instanceof Error ? cause.message : 'Sign-out could not be completed.'} You are still signed in. Please try signing out again.`
+  } finally { isSigningOut.value = false }
 }
 
-onMounted(loadQuestions)
+function onUserActivity(event: Event) {
+  if (!event.isTrusted || document.visibilityState !== 'visible' || isSigningOut.value) return
+  void adminSession.recordActivity().catch(() => { /* Session state exposes errors and handles 401. */ })
+}
+const activityEvents = ['pointerdown', 'keydown', 'scroll', 'input'] as const
+onMounted(() => {
+  void loadQuestions()
+  for (const type of activityEvents) document.addEventListener(type, onUserActivity, { passive: true, capture: true })
+})
 onBeforeUnmount(() => {
+  for (const type of activityEvents) document.removeEventListener(type, onUserActivity, { capture: true })
   loadController?.abort()
   writeController?.abort()
   deleteDialog.value?.close()
@@ -206,8 +224,11 @@ onBeforeUnmount(() => {
         <h1>Keep the world <em>curious.</em></h1>
         <p class="admin-description">Create, refine, and organise the questions behind the quiz.</p>
       </div>
-      <div class="admin-account"><span>Signed in as <strong>{{ adminSession.state.value?.username }}</strong></span><button class="button is-light" type="button" @click="signOut"><AppIcon name="logout" />Sign out</button></div>
+      <div class="admin-account"><span>Signed in as <strong>{{ adminSession.state.value?.username }}</strong></span><button class="button is-light" type="button" :class="{ 'is-loading': isSigningOut }" :disabled="isSigningOut || isSaving || isDeleting" @click="signOut"><AppIcon name="logout" />Sign out</button></div>
     </header>
+    <p v-if="signOutError" class="notification admin-error" role="alert">{{ signOutError }}</p>
+    <p v-if="adminSession.restoreError.value" class="notification admin-error" role="status">{{ adminSession.restoreError.value }}</p>
+    <p class="admin-helper">For your security, sessions end after at most 15 minutes without activity or 30 minutes overall.</p>
 
     <section class="box admin-surface admin-bank" aria-labelledby="question-bank-heading">
       <div class="admin-bank-heading">

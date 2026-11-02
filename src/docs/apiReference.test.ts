@@ -46,7 +46,8 @@ test('covers all OpenAPI operations and their declared request and response deta
     assert.deepEqual(entry.responses.map(({ status }) => status).toSorted((first, second) => first - second), statuses, `${key} response statuses`)
     assert.ok(statuses.includes(entry.successStatus) && entry.successStatus >= 200 && entry.successStatus < 300, `${key} success status`)
     const security = operation.security ?? contract.security ?? []
-    assert.equal(entry.auth, security.length > 0 && security.every((requirement) => Object.hasOwn(requirement, 'adminBearer')), `${key} admin authentication`)
+    assert.equal(entry.auth, security.length > 0 && security.every((requirement) => ['adminBearer', 'adminCookie', 'adminRefresh'].some((scheme) => Object.hasOwn(requirement, scheme))), `${key} admin authentication`)
+    if (entry.browserSession && entry.auth) assert.ok(security.some((requirement) => Object.hasOwn(requirement, 'adminCookie') || Object.hasOwn(requirement, 'adminRefresh')), `${key} cookie authentication`)
     assert.equal(entry.requestBody !== undefined, operation.requestBody !== undefined, `${key} request body`)
     assert.equal(entry.responseBody !== undefined, operation.responses[String(entry.successStatus)]?.content?.['application/json'] !== undefined, `${key} response body`)
     assert.equal(Boolean(entry.parameters?.length), entry.path.includes('{id}'))
@@ -79,12 +80,13 @@ async function runJavaScript(entry: ApiEndpoint, ok = true) {
   let jsonReads = 0
   const fetchExample = async (url: string, options: RequestInit) => {
     calls.push({ url, options })
+    const sessionLookup = entry.browserSession && !['create', 'read'].includes(entry.browserSession) && options.method === 'GET'
     return {
-      ok, status: ok ? entry.successStatus : 500, statusText: ok ? 'OK' : 'Internal Server Error',
+      ok, status: ok ? (sessionLookup ? 200 : entry.successStatus) : 500, statusText: ok ? 'OK' : 'Internal Server Error',
       async json() {
         jsonReads++
-        assert.notEqual(entry.successStatus, 204, 'A 204 response must never be parsed as JSON')
-        return entry.responseBody
+        assert.ok(sessionLookup || entry.successStatus !== 204, 'A 204 response must never be parsed as JSON')
+        return sessionLookup ? { csrfToken: 'example-csrf-value' } : entry.responseBody
       },
     }
   }
@@ -97,15 +99,18 @@ test('generated JavaScript executes the documented method, URL, body and auth he
   for (const entry of endpoints) {
     const execution = await runJavaScript(entry)
     await execution.result
-    assert.equal(execution.calls.length, 1)
-    const call = execution.calls[0]!
+    const cookieWrite = Boolean(entry.browserSession && !['create', 'read'].includes(entry.browserSession))
+    assert.equal(execution.calls.length, cookieWrite ? 2 : 1)
+    const call = execution.calls.at(-1)!
     assert.equal(call.url, buildEndpointUrl('https://quiz.test', entry))
     assert.equal(call.options.method, entry.method)
     const headers = new Headers(call.options.headers)
-    assert.equal(headers.get('Authorization'), entry.auth ? 'Bearer placeholder-test-token' : null)
+    assert.equal(headers.get('Authorization'), entry.auth && !entry.browserSession ? 'Bearer placeholder-test-token' : null)
+    assert.equal(call.options.credentials, entry.browserSession ? 'include' : 'omit')
+    assert.equal(headers.get('X-CSRF-Token'), cookieWrite ? 'example-csrf-value' : null)
     assert.equal(headers.get('Content-Type'), entry.requestBody ? 'application/json' : null)
     assert.deepEqual(call.options.body ? JSON.parse(String(call.options.body)) : undefined, entry.requestBody)
-    assert.equal(execution.jsonReads, entry.successStatus === 204 ? 0 : 1)
+    assert.equal(execution.jsonReads, (cookieWrite ? 1 : 0) + (entry.successStatus === 204 ? 0 : 1))
   }
 })
 
@@ -119,7 +124,7 @@ test('JavaScript checks response.ok before parsing or reporting success, includi
 })
 
 test('auth JavaScript reads ADMIN_TOKEN from the environment and fails before sending when missing', async () => {
-  for (const entry of endpoints.filter(({ auth }) => auth)) {
+  for (const entry of endpoints.filter(({ auth, browserSession }) => auth && !browserSession)) {
     const source = buildJavaScriptExample('https://quiz.test', entry)
     assert.match(source, /process\.env\.ADMIN_TOKEN/)
     assert.doesNotMatch(source, /localStorage|sessionStorage/)
@@ -132,7 +137,7 @@ test('auth JavaScript reads ADMIN_TOKEN from the environment and fails before se
 test('shared GET shell examples are emitted once and writes use native shell conventions', () => {
   for (const entry of endpoints) {
     const examples = buildShellExamples('https://quiz.test', entry)
-    if (entry.method === 'GET') {
+    if (entry.method === 'GET' && !entry.browserSession) {
       assert.deepEqual(Object.keys(examples), ['shared'])
       assert.match(examples.shared!, /^curl --fail-with-body/)
       assert.doesNotMatch(examples.shared!, /curl\.exe|Invoke-WebRequest/)
@@ -140,8 +145,8 @@ test('shared GET shell examples are emitted once and writes use native shell con
       assert.equal(examples.shared, undefined)
       assert.match(examples.powershell!, new RegExp(`Invoke-RestMethod -Method ${entry.method}`))
       assert.match(examples.bash!, new RegExp(`curl --fail-with-body --request ${entry.method}`))
-      assert.equal(examples.powershell!.includes('$env:ADMIN_TOKEN'), entry.auth)
-      assert.equal(examples.bash!.includes('${ADMIN_TOKEN}'), entry.auth)
+      assert.equal(examples.powershell!.includes('$env:ADMIN_TOKEN'), entry.auth && !entry.browserSession)
+      assert.equal(examples.bash!.includes('${ADMIN_TOKEN}'), entry.auth && !entry.browserSession)
       assert.equal(examples.powershell!.includes('-ContentType'), Boolean(entry.requestBody))
       assert.equal(examples.bash!.includes('--data-raw'), Boolean(entry.requestBody))
       if (entry.requestBody) {

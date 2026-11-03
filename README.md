@@ -136,9 +136,9 @@ For production, use the same-origin Netlify `/api` proxy configured below. Vite'
 
 ### Render startup handling
 
-This experimental school project uses Render's free plan, so the backend may need up to a minute to wake. When loading questions, an explicit HTTP `503` triggers a startup notice and retries every five seconds, within a total 60-second window measured from the initial request. A `503` is treated as possible startup; it does not prove the service is waking. A successful response ends the wait, while any other error immediately uses the normal error state. After the window expires, the user can retry manually.
+This experimental school project uses Render's free plan, so the backend may need up to a minute to wake. When loading questions takes longer than one second, the loading screen automatically explains the possible Render startup delay. This works even when Render keeps the initial request pending instead of returning `503`. The notice is a timing heuristic, not confirmation that Render is starting. It clears when loading succeeds, fails, is replaced by another load, or the quiz is disposed.
 
-Network errors, timeouts, and other HTTP statuses do not trigger startup handling. The browser must be able to read the actual response through CORS; a CORS-blocked response appears as a generic network error. Answer submissions are never retried automatically. These behaviors are covered locally; a real Render cold start has not been verified.
+An actual HTTP `503` still retries every five seconds within the total 60-second loading window, measured from the initial request. Other HTTP statuses, network errors, and invalid responses immediately use the normal error state. After the window expires, the user can retry manually. The browser must be able to read the actual response through CORS; a CORS-blocked response appears as a generic network error. Answer submissions are never retried automatically. These behaviors are covered locally; a real Render cold start has not been verified.
 
 ## Checks and production build
 

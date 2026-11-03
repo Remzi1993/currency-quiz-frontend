@@ -26,6 +26,7 @@ interface QuizServices {
 
 const STARTUP_TIMEOUT_MS = 60_000
 const STARTUP_RETRY_MS = 5_000
+const STARTUP_NOTICE_DELAY_MS = 1_000
 
 function waitForRetry(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -132,8 +133,12 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
     const deadline = api.now() + STARTUP_TIMEOUT_MS
     const timeoutError = new DOMException('Question loading timed out', 'TimeoutError')
     const timeout = setTimeout(() => controller.abort(timeoutError), STARTUP_TIMEOUT_MS)
+    // Render can keep the first request pending while the service starts.
+    const startupNotice = setTimeout(() => { isWakingUp.value = true }, STARTUP_NOTICE_DELAY_MS)
     cancelLoading = () => {
       clearTimeout(timeout)
+      clearTimeout(startupNotice)
+      isWakingUp.value = false
       controller.abort()
     }
     try {
@@ -152,8 +157,6 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
         } catch (cause) {
           if (loadingOperation !== operation) return
           if (!(cause instanceof ApiError) || cause.status !== 503) throw cause
-          // Only an actual HTTP 503 starts the Render wake-up experience.
-          isWakingUp.value = true
           await waitForRetry(Math.min(STARTUP_RETRY_MS, Math.max(0, deadline - api.now())), controller.signal)
         }
       }
@@ -167,6 +170,7 @@ export function useQuiz(services: Partial<QuizServices> = {}) {
       phase.value = 'error'
     } finally {
       clearTimeout(timeout)
+      clearTimeout(startupNotice)
       if (loadingOperation === operation) {
         cancelLoading = undefined
         isWakingUp.value = false

@@ -168,7 +168,62 @@ test('ignores stale loads and pending responses after scope disposal', async () 
   assert.equal(quiz.phase.value, 'loading')
 })
 
-test('keeps the loading screen during HTTP 503 wake-up retries and clears it on success', async (t) => {
+test('shows the startup notice after one second of a pending request and clears it on success', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  let resolveLoad!: (questions: Question[]) => void
+  let calls = 0
+  const quiz = fixture({ loadQuestions: () => {
+    calls++
+    return new Promise((resolve) => { resolveLoad = resolve })
+  } })
+  const pending = quiz.load()
+  t.mock.timers.tick(999)
+  assert.equal(quiz.phase.value, 'loading')
+  assert.equal(quiz.isWakingUp.value, false)
+  t.mock.timers.tick(1)
+  assert.equal(quiz.isWakingUp.value, true)
+  assert.equal(quiz.error.value, null)
+  resolveLoad(questions)
+  await pending
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.isWakingUp.value, false)
+  t.mock.timers.tick(120_000)
+  assert.equal(quiz.isWakingUp.value, false)
+  assert.equal(calls, 1)
+})
+
+test('finishing before one second cancels the notice for success, empty banks, and errors', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  for (const result of [questions, [], new ApiError('Internal server error', { status: 500 })]) {
+    const quiz = fixture({ loadQuestions: async () => {
+      if (result instanceof Error) throw result
+      return result
+    } })
+    await quiz.load()
+    assert.equal(quiz.phase.value, result instanceof Error ? 'error' : result.length ? 'welcome' : 'empty')
+    assert.equal(quiz.isWakingUp.value, false)
+    t.mock.timers.tick(60_000)
+    assert.equal(quiz.isWakingUp.value, false)
+  }
+})
+
+test('a slow non-503 failure clears the notice and retains the ordinary error', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  let rejectLoad!: (reason: Error) => void
+  const quiz = fixture({ loadQuestions: () => new Promise((_resolve, reject) => { rejectLoad = reject }) })
+  const pending = quiz.load()
+  t.mock.timers.tick(1000)
+  assert.equal(quiz.isWakingUp.value, true)
+  rejectLoad(new ApiError('Internal server error', { status: 500 }))
+  await pending
+  assert.equal(quiz.phase.value, 'error')
+  assert.equal(quiz.error.value, 'Internal server error')
+  assert.equal(quiz.isWakingUp.value, false)
+  t.mock.timers.tick(60_000)
+  assert.equal(quiz.isWakingUp.value, false)
+})
+
+test('keeps the loading screen during HTTP 503 retries and clears it on success', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
   const requestTimes: number[] = []
   const quiz = fixture({ loadQuestions: async () => {
@@ -179,10 +234,12 @@ test('keeps the loading screen during HTTP 503 wake-up retries and clears it on 
   const pending = quiz.load()
   await setImmediate()
   assert.equal(quiz.phase.value, 'loading')
-  assert.equal(quiz.isWakingUp.value, true)
+  assert.equal(quiz.isWakingUp.value, false)
   assert.equal(quiz.error.value, null)
 
-  t.mock.timers.tick(4999)
+  t.mock.timers.tick(1000)
+  assert.equal(quiz.isWakingUp.value, true)
+  t.mock.timers.tick(3999)
   await setImmediate()
   assert.deepEqual(requestTimes, [0])
   t.mock.timers.tick(1)
@@ -226,7 +283,7 @@ test('does not retry other HTTP statuses, network errors, timeouts, or invalid r
         const pending = quiz.load()
         await setImmediate()
         if (after503) {
-          assert.equal(quiz.isWakingUp.value, true)
+          assert.equal(quiz.isWakingUp.value, false)
           caseTest.mock.timers.tick(5000)
         }
         await pending
@@ -335,8 +392,9 @@ test('reloading cancels the old wake-up delay and keeps the newer load result', 
   } })
   const abandoned = quiz.load()
   await setImmediate()
-  assert.equal(quiz.isWakingUp.value, true)
+  assert.equal(quiz.isWakingUp.value, false)
   t.mock.timers.tick(2500)
+  assert.equal(quiz.isWakingUp.value, true)
   await quiz.load()
   await abandoned
   assert.equal(firstSignal?.aborted, true)
@@ -346,6 +404,28 @@ test('reloading cancels the old wake-up delay and keeps the newer load result', 
   await setImmediate()
   assert.equal(calls, 2)
   assert.deepEqual(quiz.questions.value, questions)
+})
+
+test('a replacement load gets its own one-second notice delay and ignores stale completion', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+  const resolvers: Array<(value: Question[]) => void> = []
+  const quiz = fixture({ loadQuestions: () => new Promise((resolve) => { resolvers.push(resolve) }) })
+  const abandoned = quiz.load()
+  t.mock.timers.tick(500)
+  const current = quiz.load()
+  t.mock.timers.tick(500)
+  assert.equal(quiz.isWakingUp.value, false)
+  resolvers[0]!(questions)
+  await abandoned
+  assert.equal(quiz.phase.value, 'loading')
+  t.mock.timers.tick(499)
+  assert.equal(quiz.isWakingUp.value, false)
+  t.mock.timers.tick(1)
+  assert.equal(quiz.isWakingUp.value, true)
+  resolvers[1]!(questions)
+  await current
+  assert.equal(quiz.phase.value, 'welcome')
+  assert.equal(quiz.isWakingUp.value, false)
 })
 
 test('scope disposal cancels the wake-up delay without another request', async (t) => {
@@ -360,7 +440,7 @@ test('scope disposal cancels the wake-up delay without another request', async (
   } }))!
   const pending = quiz.load()
   await setImmediate()
-  assert.equal(quiz.isWakingUp.value, true)
+  assert.equal(quiz.isWakingUp.value, false)
   scope.stop()
   await pending
   assert.equal(signal?.aborted, true)
@@ -369,6 +449,7 @@ test('scope disposal cancels the wake-up delay without another request', async (
   assert.equal(calls, 1)
   assert.equal(quiz.questions.value.length, 0)
   assert.equal(quiz.error.value, null)
+  assert.equal(quiz.isWakingUp.value, false)
 })
 
 function memoryStorage() {

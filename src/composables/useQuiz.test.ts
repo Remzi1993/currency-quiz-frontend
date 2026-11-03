@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, describe, afterEach, vi } from 'vitest'
 import { setImmediate } from 'node:timers/promises'
 import { effectScope } from 'vue'
 import { ApiError, type AnswerResult, type Question } from '../api/client.ts'
 import { QUIZ_STORAGE_KEY, readQuizState, type QuizStorage } from './quizStorage.ts'
 import { useQuiz } from './useQuiz.ts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 const questions: Question[] = [
   { id: '00000000-0000-0000-0000-000000000001', text: 'Currency of Japan?', options: ['JPY', 'EUR'] },
@@ -168,8 +173,9 @@ test('ignores stale loads and pending responses after scope disposal', async () 
   assert.equal(quiz.phase.value, 'loading')
 })
 
-test('shows the startup notice after one second of a pending request and clears it on success', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('shows the startup notice after one second of a pending request and clears it on success', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   let resolveLoad!: (questions: Question[]) => void
   let calls = 0
   const quiz = fixture({ loadQuestions: () => {
@@ -177,23 +183,24 @@ test('shows the startup notice after one second of a pending request and clears 
     return new Promise((resolve) => { resolveLoad = resolve })
   } })
   const pending = quiz.load()
-  t.mock.timers.tick(999)
+  vi.advanceTimersByTime(999)
   assert.equal(quiz.phase.value, 'loading')
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   assert.equal(quiz.isWakingUp.value, true)
   assert.equal(quiz.error.value, null)
   resolveLoad(questions)
   await pending
   assert.equal(quiz.phase.value, 'welcome')
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(120_000)
+  vi.advanceTimersByTime(120_000)
   assert.equal(quiz.isWakingUp.value, false)
   assert.equal(calls, 1)
 })
 
-test('finishing before one second cancels the notice for success, empty banks, and errors', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('finishing before one second cancels the notice for success, empty banks, and errors', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   for (const result of [questions, [], new ApiError('Internal server error', { status: 500 })]) {
     const quiz = fixture({ loadQuestions: async () => {
       if (result instanceof Error) throw result
@@ -202,29 +209,31 @@ test('finishing before one second cancels the notice for success, empty banks, a
     await quiz.load()
     assert.equal(quiz.phase.value, result instanceof Error ? 'error' : result.length ? 'welcome' : 'empty')
     assert.equal(quiz.isWakingUp.value, false)
-    t.mock.timers.tick(60_000)
+    vi.advanceTimersByTime(60_000)
     assert.equal(quiz.isWakingUp.value, false)
   }
 })
 
-test('a slow non-503 failure clears the notice and retains the ordinary error', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('a slow non-503 failure clears the notice and retains the ordinary error', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   let rejectLoad!: (reason: Error) => void
   const quiz = fixture({ loadQuestions: () => new Promise((_resolve, reject) => { rejectLoad = reject }) })
   const pending = quiz.load()
-  t.mock.timers.tick(1000)
+  vi.advanceTimersByTime(1000)
   assert.equal(quiz.isWakingUp.value, true)
   rejectLoad(new ApiError('Internal server error', { status: 500 }))
   await pending
   assert.equal(quiz.phase.value, 'error')
   assert.equal(quiz.error.value, 'Internal server error')
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(60_000)
+  vi.advanceTimersByTime(60_000)
   assert.equal(quiz.isWakingUp.value, false)
 })
 
-test('keeps the loading screen during HTTP 503 retries and clears it on success', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('keeps the loading screen during HTTP 503 retries and clears it on success', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   const requestTimes: number[] = []
   const quiz = fixture({ loadQuestions: async () => {
     requestTimes.push(Date.now())
@@ -237,30 +246,30 @@ test('keeps the loading screen during HTTP 503 retries and clears it on success'
   assert.equal(quiz.isWakingUp.value, false)
   assert.equal(quiz.error.value, null)
 
-  t.mock.timers.tick(1000)
+  vi.advanceTimersByTime(1000)
   assert.equal(quiz.isWakingUp.value, true)
-  t.mock.timers.tick(3999)
+  vi.advanceTimersByTime(3999)
   await setImmediate()
   assert.deepEqual(requestTimes, [0])
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   await setImmediate()
   assert.deepEqual(requestTimes, [0, 5000])
   assert.equal(quiz.phase.value, 'loading')
   assert.equal(quiz.isWakingUp.value, true)
 
-  t.mock.timers.tick(5000)
+  vi.advanceTimersByTime(5000)
   await pending
   assert.deepEqual(requestTimes, [0, 5000, 10000])
   assert.equal(quiz.phase.value, 'welcome')
   assert.equal(quiz.isWakingUp.value, false)
   assert.equal(quiz.error.value, null)
   assert.deepEqual(quiz.questions.value, questions)
-  t.mock.timers.tick(60_000)
+  vi.advanceTimersByTime(60_000)
   await setImmediate()
   assert.equal(requestTimes.length, 3)
 })
 
-test('does not retry other HTTP statuses, network errors, timeouts, or invalid responses', async (t) => {
+describe('does not retry other HTTP statuses, network errors, timeouts, or invalid responses', () => {
   const failures = [
     new ApiError('Internal server error', { status: 500 }),
     new ApiError('Bad gateway', { status: 502 }),
@@ -272,8 +281,9 @@ test('does not retry other HTTP statuses, network errors, timeouts, or invalid r
   ]
   for (const failure of failures) {
     for (const after503 of [false, true]) {
-      await t.test(`${failure.message}${after503 ? ' after HTTP 503' : ' on the first request'}`, async (caseTest) => {
-        caseTest.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+      test(`${failure.message}${after503 ? ' after HTTP 503' : ' on the first request'}`, async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+        vi.setSystemTime(0)
         let calls = 0
         const quiz = fixture({ loadQuestions: async () => {
           calls++
@@ -284,14 +294,14 @@ test('does not retry other HTTP statuses, network errors, timeouts, or invalid r
         await setImmediate()
         if (after503) {
           assert.equal(quiz.isWakingUp.value, false)
-          caseTest.mock.timers.tick(5000)
+          vi.advanceTimersByTime(5000)
         }
         await pending
         assert.equal(quiz.phase.value, 'error')
         assert.equal(quiz.isWakingUp.value, false)
         assert.equal(quiz.error.value, failure.message)
         assert.equal(calls, after503 ? 2 : 1)
-        caseTest.mock.timers.tick(120_000)
+        vi.advanceTimersByTime(120_000)
         await setImmediate()
         assert.equal(calls, after503 ? 2 : 1)
       })
@@ -299,8 +309,9 @@ test('does not retry other HTTP statuses, network errors, timeouts, or invalid r
   }
 })
 
-test('includes the initial request in the one-minute wake-up budget and allows manual recovery', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('includes the initial request in the one-minute wake-up budget and allows manual recovery', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   const requestTimes: number[] = []
   let available = false
   const quiz = fixture({ loadQuestions: async () => {
@@ -312,22 +323,22 @@ test('includes the initial request in the one-minute wake-up budget and allows m
     throw new ApiError('Service unavailable', { status: 503 })
   } })
   const pending = quiz.load()
-  t.mock.timers.tick(10_000)
+  vi.advanceTimersByTime(10_000)
   await setImmediate()
   assert.equal(quiz.isWakingUp.value, true)
   for (let elapsed = 15_000; elapsed <= 55_000; elapsed += 5000) {
-    t.mock.timers.tick(5000)
+    vi.advanceTimersByTime(5000)
     await setImmediate()
     assert.equal(quiz.phase.value, 'loading')
   }
   assert.deepEqual(requestTimes, [0, 15_000, 20_000, 25_000, 30_000, 35_000, 40_000, 45_000, 50_000, 55_000])
-  t.mock.timers.tick(5000)
+  vi.advanceTimersByTime(5000)
   await pending
   assert.equal(Date.now(), 60_000)
   assert.equal(quiz.phase.value, 'error')
   assert.equal(quiz.isWakingUp.value, false)
   assert.match(quiz.error.value!, /still unavailable after one minute/)
-  t.mock.timers.tick(120_000)
+  vi.advanceTimersByTime(120_000)
   await setImmediate()
   assert.equal(requestTimes.length, 10)
 
@@ -339,8 +350,9 @@ test('includes the initial request in the one-minute wake-up budget and allows m
   assert.deepEqual(quiz.questions.value, questions)
 })
 
-test('aborts a hung retry at one minute measured from the initial GET', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('aborts a hung retry at one minute measured from the initial GET', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   const requestTimes: number[] = []
   let retrySignal: AbortSignal | undefined
   let abortedAt: number | undefined
@@ -359,18 +371,18 @@ test('aborts a hung retry at one minute measured from the initial GET', async (t
     })
   } })
   const pending = quiz.load()
-  t.mock.timers.tick(12_000)
+  vi.advanceTimersByTime(12_000)
   await setImmediate()
-  t.mock.timers.tick(5000)
+  vi.advanceTimersByTime(5000)
   await setImmediate()
   assert.deepEqual(requestTimes, [0, 17_000])
   assert.equal(retrySignal?.aborted, false)
   assert.equal(quiz.isWakingUp.value, true)
-  t.mock.timers.tick(42_999)
+  vi.advanceTimersByTime(42_999)
   await setImmediate()
   assert.equal(quiz.phase.value, 'loading')
   assert.equal(retrySignal?.aborted, false)
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   await pending
   assert.equal(abortedAt, 60_000)
   assert.equal(retrySignal?.aborted, true)
@@ -379,8 +391,9 @@ test('aborts a hung retry at one minute measured from the initial GET', async (t
   assert.match(quiz.error.value!, /still unavailable after one minute/)
 })
 
-test('reloading cancels the old wake-up delay and keeps the newer load result', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('reloading cancels the old wake-up delay and keeps the newer load result', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   let calls = 0
   let firstSignal: AbortSignal | undefined
   const quiz = fixture({ loadQuestions: async (signal) => {
@@ -393,34 +406,35 @@ test('reloading cancels the old wake-up delay and keeps the newer load result', 
   const abandoned = quiz.load()
   await setImmediate()
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(2500)
+  vi.advanceTimersByTime(2500)
   assert.equal(quiz.isWakingUp.value, true)
   await quiz.load()
   await abandoned
   assert.equal(firstSignal?.aborted, true)
   assert.equal(quiz.phase.value, 'welcome')
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(120_000)
+  vi.advanceTimersByTime(120_000)
   await setImmediate()
   assert.equal(calls, 2)
   assert.deepEqual(quiz.questions.value, questions)
 })
 
-test('a replacement load gets its own one-second notice delay and ignores stale completion', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('a replacement load gets its own one-second notice delay and ignores stale completion', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   const resolvers: Array<(value: Question[]) => void> = []
   const quiz = fixture({ loadQuestions: () => new Promise((resolve) => { resolvers.push(resolve) }) })
   const abandoned = quiz.load()
-  t.mock.timers.tick(500)
+  vi.advanceTimersByTime(500)
   const current = quiz.load()
-  t.mock.timers.tick(500)
+  vi.advanceTimersByTime(500)
   assert.equal(quiz.isWakingUp.value, false)
   resolvers[0]!(questions)
   await abandoned
   assert.equal(quiz.phase.value, 'loading')
-  t.mock.timers.tick(499)
+  vi.advanceTimersByTime(499)
   assert.equal(quiz.isWakingUp.value, false)
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   assert.equal(quiz.isWakingUp.value, true)
   resolvers[1]!(questions)
   await current
@@ -428,8 +442,9 @@ test('a replacement load gets its own one-second notice delay and ignores stale 
   assert.equal(quiz.isWakingUp.value, false)
 })
 
-test('scope disposal cancels the wake-up delay without another request', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+test('scope disposal cancels the wake-up delay without another request', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(0)
   let calls = 0
   let signal: AbortSignal | undefined
   const scope = effectScope()
@@ -444,7 +459,7 @@ test('scope disposal cancels the wake-up delay without another request', async (
   scope.stop()
   await pending
   assert.equal(signal?.aborted, true)
-  t.mock.timers.tick(120_000)
+  vi.advanceTimersByTime(120_000)
   await setImmediate()
   assert.equal(calls, 1)
   assert.equal(quiz.questions.value.length, 0)

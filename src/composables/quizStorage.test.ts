@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import {
   getQuizStorage, QUIZ_STORAGE_KEY, readQuizState, writeQuizState,
   type QuizStorage, type StoredQuizSession, type StoredQuizState,

@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, afterEach, vi, onTestFinished } from 'vitest'
 import { isReadonly } from 'vue'
 import { ApiError } from '../api/client.ts'
 import type { AdminApi, BrowserSessionResponse } from '../api/adminClient.ts'
 import { ADMIN_SESSION_STORAGE_KEY, createAdminSession } from './adminSession.ts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 const credentials = { username: 'school-admin', password: 'example-only-password' }
 const noTimer = () => () => {}
@@ -116,14 +121,15 @@ test('401 during sign-out means the server session has already ended', async () 
   assert.equal(session.state.value, null)
 })
 
-test('expiry updates reactive state and rejects expired metadata even before a delayed timer', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 })
+test('expiry updates reactive state and rejects expired metadata even before a delayed timer', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(1000)
   const session = createAdminSession({ api: fakeApi({ getSession: async () => metadata({ expiresIn: 2 }) }) })
-  t.after(() => session.dispose())
+  onTestFinished(() => session.dispose())
   await session.signIn(credentials)
-  t.mock.timers.tick(1999)
+  vi.advanceTimersByTime(1999)
   assert.equal(session.isAuthenticated.value, true)
-  t.mock.timers.tick(1)
+  vi.advanceTimersByTime(1)
   assert.equal(session.state.value, null)
   let now = 1000
   const delayed = createAdminSession({ api: fakeApi({ getSession: async () => metadata({ expiresIn: 1 }) }), now: () => now, schedule: noTimer })
@@ -220,17 +226,18 @@ test('blocked storage and SSR do not prevent cookie sessions or read localStorag
   }
 })
 
-test('access expiry never polls or refreshes in the background and idle expiry signs out', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 })
+test('access expiry never polls or refreshes in the background and idle expiry signs out', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.setSystemTime(1000)
   let refreshes = 0
   let activities = 0
   const session = createAdminSession({ api: fakeApi({ refresh: async () => { refreshes++; return metadata() }, recordActivity: async () => { activities++; return metadata() } }) })
-  t.after(() => session.dispose())
+  onTestFinished(() => session.dispose())
   await session.signIn(credentials)
-  t.mock.timers.tick(300_000)
+  vi.advanceTimersByTime(300_000)
   assert.equal(session.isAuthenticated.value, true)
   assert.equal(refreshes, 0); assert.equal(activities, 0)
-  t.mock.timers.tick(600_000)
+  vi.advanceTimersByTime(600_000)
   assert.equal(session.isAuthenticated.value, false)
   assert.equal(refreshes, 0); assert.equal(activities, 0)
 })

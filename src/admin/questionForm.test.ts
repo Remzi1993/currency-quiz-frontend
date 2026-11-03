@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import type { PublicQuestion } from '../../shared/generated/typescript/schema'
 import { haveOptionsChanged, validateQuestionForm, type QuestionFormDraft } from './questionForm.ts'
 

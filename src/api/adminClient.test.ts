@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, afterEach, vi } from 'vitest'
 import { ApiError } from './client.ts'
 import { createAdminApi, type AdminApi, type CreateQuestionRequest } from './adminClient.ts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 const question = { id: 'c72b3aab-633f-4268-88e7-c6ba1c3bb217', text: 'Which currency is used in Japan?', options: ['Chinese yuan', 'Japanese yen', 'South Korean won', 'Thai baht'] }
 const adminQuestion = { ...question, correctAnswer: 'Japanese yen' }
@@ -162,10 +167,10 @@ test('rate limits retain Retry-After and no writes or refreshes are automaticall
   }
 })
 
-test('combines caller cancellation with bounded login, read, session and write timeouts', async (context) => {
+test('combines caller cancellation with bounded login, read, session and write timeouts', async () => {
   const deadlines: number[] = []
   const timeoutControllers: AbortController[] = []
-  context.mock.method(AbortSignal, 'timeout', (milliseconds: number) => { deadlines.push(milliseconds); const controller = new AbortController(); timeoutControllers.push(controller); return controller.signal })
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds: number) => { deadlines.push(milliseconds); const controller = new AbortController(); timeoutControllers.push(controller); return controller.signal })
   const methods: Array<(api: AdminApi, signal: AbortSignal) => Promise<unknown>> = [
     (api, signal) => api.login(credentials, signal), (api, signal) => api.getSession(signal),
     (api, signal) => api.listQuestions(signal), (api, signal) => api.logout(csrfToken, signal),

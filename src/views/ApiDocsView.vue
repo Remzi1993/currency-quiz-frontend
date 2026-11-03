@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import {
@@ -10,7 +10,7 @@ import { projectLinks } from '../projectLinks.ts'
 
 const route = useRoute()
 const swaggerUrl = `${import.meta.env.BASE_URL}swagger/`
-const sectionHeading = ref<HTMLElement | null>(null)
+const sectionHeading = useTemplateRef<HTMLElement>('sectionHeading')
 const baseUrlInput = ref(import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') || window.location.origin)
 const questionId = ref(exampleQuestionId)
 const answer = ref('Japanese yen')

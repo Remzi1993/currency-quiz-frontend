@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import ThemeSelector from './ThemeSelector.vue'
@@ -7,9 +7,9 @@ import ThemeSelector from './ThemeSelector.vue'
 const emit = defineEmits<{ showHelp: [] }>()
 const route = useRoute()
 const brandIconUrl = `${import.meta.env.BASE_URL}favicon.svg`
-const navbar = ref<HTMLElement | null>(null)
-const burger = ref<HTMLButtonElement | null>(null)
-const themeSelector = ref<InstanceType<typeof ThemeSelector> | null>(null)
+const navbar = useTemplateRef<HTMLElement>('navbar')
+const burger = useTemplateRef<HTMLButtonElement>('burger')
+const themeSelector = useTemplateRef('themeSelector')
 const menuOpen = ref(false)
 let desktop: MediaQueryList | undefined
 
@@ -44,7 +44,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onPointerDown)
-  desktop?.removeEventListener('change', onBreakpointChange)
+  if (desktop) desktop.removeEventListener('change', onBreakpointChange)
 })
 </script>
 

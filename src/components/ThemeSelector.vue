@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useId, useTemplateRef } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { resolvedTheme, setThemePreference, themePreference } from '../composables/useTheme.ts'
 
 const emit = defineEmits<{ open: [] }>()
-const container = ref<HTMLElement | null>(null)
-const toggle = ref<HTMLButtonElement | null>(null)
+const container = useTemplateRef<HTMLElement>('container')
+const toggle = useTemplateRef<HTMLButtonElement>('toggle')
 const isOpen = ref(false)
 const panelId = useId()
 const themes = [

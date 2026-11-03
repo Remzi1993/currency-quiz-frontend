@@ -105,7 +105,9 @@ export function createAdminApi(options: { baseUrl?: string; fetch?: typeof globa
   const baseUrl = (options.baseUrl ?? '').trim().replace(/\/+$/, '')
   const fetchRequest = options.fetch ?? globalThis.fetch
 
-  async function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', timeoutMs: number, signal: AbortSignal | undefined, csrfToken?: string, body?: object): Promise<Response> {
+  async function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', timeoutMs: number,
+                      signal: AbortSignal | undefined, csrfToken?: string, body?: object): Promise<Response>
+  {
     const authenticatedWrite = method !== 'GET' && !(path === '/api/v1/auth/session' && method === 'POST')
     if (authenticatedWrite && (typeof csrfToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(csrfToken))) {
       throw new ApiError('Your admin session could not be verified. Please sign in again.')

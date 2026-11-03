@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import QuestionEditor from '../components/QuestionEditor.vue'
@@ -21,7 +21,7 @@ const editorOpen = ref(false)
 const editingQuestion = shallowRef<PublicQuestion | null>(null)
 const isSaving = ref(false)
 const saveError = ref('')
-const deleteDialog = ref<HTMLDialogElement | null>(null)
+const deleteDialog = useTemplateRef<HTMLDialogElement>('deleteDialog')
 const deletingQuestion = shallowRef<PublicQuestion | null>(null)
 const isDeleting = ref(false)
 const deleteError = ref('')

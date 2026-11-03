@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, useTemplateRef, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppIcon from './components/AppIcon.vue'
 import AppNavbar from './components/AppNavbar.vue'
 import AppFooter from './components/AppFooter.vue'
 
 const route = useRoute()
-const helpDialog = ref<HTMLDialogElement | null>(null)
+const helpDialog = useTemplateRef<HTMLDialogElement>('helpDialog')
 
 function focusMain() {
   document.getElementById('main-content')?.focus()

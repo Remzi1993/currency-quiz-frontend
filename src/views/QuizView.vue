@@ -139,8 +139,8 @@ onMounted(initialize)
           <span class="state-icon"><AppIcon name="globe" /></span>
           <template v-if="isWakingUp">
             <p class="eyebrow">EXPERIMENTAL SCHOOL PROJECT</p>
-            <h2 class="panel-title">The quiz service is waking up.</h2>
-            <p class="muted">This website is a prototype for a school project, the backend is hosted on Render and uses the Free plan. The backend goes to sleep after periods of inactivity and needs to start up again.</p>
+            <h2 class="panel-title">The quiz service may be waking up.</h2>
+            <p class="muted">Loading is taking a little longer. This website is a prototype for a school project, with a backend hosted on Render’s Free plan. The service goes to sleep after periods of inactivity and needs time to start again.</p>
             <p class="muted startup-note">Startup can take up to one minute. We’re checking automatically — you can keep this page open.</p>
           </template>
           <template v-else>

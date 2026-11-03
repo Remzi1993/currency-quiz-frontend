@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test, afterEach, vi } from 'vitest'
 import { ApiError, createQuizApi } from './client.ts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 const question = {
   id: 'c72b3aab-633f-4268-88e7-c6ba1c3bb217',
@@ -218,9 +223,9 @@ test('passes the caller abort signal to the question request', async () => {
   })
 })
 
-test('allows 60 seconds for loading while answer checks retain their 15 second timeout', async (context) => {
+test('allows 60 seconds for loading while answer checks retain their 15 second timeout', async () => {
   const deadlines: number[] = []
-  context.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds: number) => {
     deadlines.push(milliseconds)
     return new AbortController().signal
   })

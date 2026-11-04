@@ -177,13 +177,15 @@ Playwright owns Vite at `127.0.0.1:4173` in test mode and an HTTP fake at `127.0
 
 | Command or artifact | Purpose |
 | --- | --- |
-| `npm run test:coverage` | V8 coverage with gates of 90% lines/statements, 85% functions and 80% branches for the explicitly listed logic modules and question editor; this is not whole-application coverage. |
+| `npm run test:coverage` | Run Vitest with V8 coverage; require at least 80% aggregate lines, statements, functions and branches across the selected logic modules and question editor. |
 | `coverage/index.html`, `coverage/lcov.info`, `coverage/coverage-summary.json` | Human-readable coverage, editor/tool integration and CI metrics. |
 | `reports/vitest/` | JUnit and JSON results from each Vitest run. |
 | `npm run test:e2e:report` | Open Playwright's HTML report; failure traces and screenshots are retained under `test-results/`. |
-| `npm run test:mutation` | Stryker mutates `src/admin/questionForm.ts`; the build fails below a 75% mutation score, with an 85% improvement target. |
+| `npm run test:mutation` | Stryker mutates `src/admin/questionForm.ts`; the pipeline fails below a 75% mutation score, with an 85% improvement target. |
 | `reports/mutation/index.html`, `reports/mutation/mutation.json` | Inspect surviving mutations and identify missing assertions. This score applies only to question validation. |
 | `node scripts/test-summary.mjs [vitest\|e2e\|mutation\|all]` | Print metrics from existing reports; CI also appends them to the Actions job summary. Defaults to `all`; it does not run tests. |
+
+Coverage is collected while the tests execute and checked afterwards in that same Vitest run. Each metric must reach 80% across the configured source scope; `perFile: false` means individual files do not each need 80%. Other Vue views and components remain outside this scope, so these are not whole-application percentages.
 
 The scoped `minimatch`, `glob` and `qs` overrides in `package.json` select patched transitive dependencies used by Stryker and Vue Test Utils' formatter. They prevent the new testing tools from adding known moderate advisories. Recheck and remove the overrides when upstream dependencies adopt the patched versions; rerun component tests and mutation testing when changing them. The previously documented low-severity Swagger advisory remains. Stryker excludes generated coverage, reports and build artifacts from its sandbox so temporary files do not become test inputs or cause copy races.
 
@@ -234,18 +236,30 @@ TypeScript uses `target: "ESNext"` and `lib: ["ESNext", "DOM", "DOM.Iterable"]` 
 
 ## Continuous integration
 
-The [Frontend CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual Actions runs. Three independent jobs check out the pinned `shared/` submodule and install locked dependencies with Node.js 26: `checks` runs type checking → Vitest with coverage gates → build; `e2e` installs Chromium and runs the isolated Playwright flows; `mutation` runs the question-form mutation gate. TypeScript's strict checks provide static analysis; no standalone linter is configured. The workflow builds without deploying or changing Netlify settings. See [CI/CD Basics](docs/managing-and-collaborating/starting-points/ci-cd-basics.md).
+The [Frontend CI workflow](.github/workflows/ci.yml) runs on pushes to `main` and `dev`, including merge commits, on all pull requests, and on manual Actions runs. Five jobs run in strict sequence; each requires the previous job to succeed:
 
-Each job adds metrics to its Actions summary and uploads available HTML, JSON and JUnit evidence even when a test fails. Artifacts are retained for 14 days. Download reports to compare failures, coverage and surviving mutants between runs; no historical dashboard service is configured. Local verification does not establish that the hosted workflow has run successfully.
+| Stage | Job ID | Work |
+| --- | --- | --- |
+| 1. Tests and coverage | `test` | Run unit, component and contract tests with Vitest and enforce the 80% aggregate coverage gates. |
+| 2. Type check | `checks` | Check application, configuration and test types. |
+| 3. Production build | `build` | Validate the production bundle and upload `dist/` as `currency-quiz-build`. |
+| 4. Browser tests | `e2e` | Install Chromium and run the isolated Playwright flows. |
+| 5. Mutation tests | `mutation` | Enforce the question-form mutation gate. |
 
-Actions are pinned to full commit IDs with release-version comments; update both together when upgrading. After committing and pushing the workflow, open **Actions → Frontend CI** to inspect a run. Manual runs become available from the default branch. To require successful checks before merging, add `checks`, `e2e` and `mutation` to the branch ruleset after the first run. Branch protection and Netlify deployment gates are configured separately.
+Every stage starts in a fresh workspace, checks out the pinned `shared/` submodule recursively, sets up Node.js 26 with npm caching, and installs locked dependencies using `npm ci`. A failure skips all later stages. Tests and their coverage gate run first, followed by type checking and bundle validation, before the more expensive browser and mutation suites. Coverage needs test execution, so it is collected in the first test stage rather than scheduled as a separate earlier check. Browser tests still use their isolated Vite server and HTTP fake; they do not serve the production artifact. TypeScript's strict checks provide static analysis; no standalone linter is configured. The workflow builds without deploying or changing Netlify settings. See [CI/CD Basics](docs/managing-and-collaborating/starting-points/ci-cd-basics.md).
+
+The test, browser and mutation jobs add metrics to their Actions summaries and upload available HTML, JSON and JUnit evidence even when their test step fails. Later jobs remain skipped. Test reports and the successful production build artifact are retained for 14 days. The build artifact can exist when a later browser or mutation stage fails; its presence does not mean the whole pipeline passed. Download reports to compare failures, coverage and surviving mutants between runs; no historical dashboard service is configured. Local verification does not establish that the hosted workflow has run successfully.
+
+Actions use explicit release tags: `actions/checkout@v7.0.1`, `actions/setup-node@v7.1.0` and `actions/upload-artifact@v7.0.2`. Update these tags when upgrading. After committing and pushing the workflow, open **Actions → Frontend CI** to inspect a run. Manual runs become available from the default branch. Configure the branch ruleset to require all five named stage checks shown above after the first run. Branch protection and Netlify deployment gates are configured separately.
 
 Run the same checks from the frontend root in **PowerShell 7+ and Linux/Bash**:
 
 ```sh
 git submodule update --init --recursive
 npm ci
+npm run test:coverage
 npm run typecheck
-npm test
 npm run build
+npm run test:e2e
+npm run test:mutation
 ```

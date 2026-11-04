@@ -3,6 +3,7 @@
   "testRunner": "vitest",
   "vitest": { "configFile": "vitest.config.ts" },
   "mutate": ["src/admin/questionForm.ts"],
+  "ignorePatterns": ["coverage/**", "reports/**", "playwright-report/**", "test-results/**", "dist/**"],
   "coverageAnalysis": "perTest",
   "reporters": ["clear-text", "progress", "html", "json"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },

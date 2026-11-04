@@ -2,6 +2,7 @@ name: Frontend CI
 
 on:
   push:
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -13,18 +14,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
+  test:
+    name: 1. Tests and coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Check out repository and contract
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repo and shared contract
+        uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit, component and consumer contract tests with 80% minimum coverage
+        run: npm run test:coverage
+
+      - name: Summarise test results
+        if: always()
+        run: node scripts/test-summary.mjs vitest
+
+      - name: Upload Vitest and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: vitest-and-coverage
+          path: |
+            reports/vitest/
+            coverage/
+          retention-days: 14
+
+  checks:
+    name: 2. Type check
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repo and shared contract
+        uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '26'
           cache: npm
@@ -35,38 +75,52 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Unit, component and consumer contract tests with coverage gates
-        run: npm run test:coverage
-
-      - name: Build
-        run: npm run build
-
-      - name: Summarise test results
-        if: always()
-        run: node scripts/test-summary.mjs vitest
-
-      - name: Upload Vitest and coverage reports
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: vitest-and-coverage
-          path: |
-            reports/vitest/
-            coverage/
-          retention-days: 14
-
-  e2e:
+  build:
+    name: 3. Production build
+    needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Check out repository and contract
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repo and shared contract
+        uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: currency-quiz-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e:
+    name: 4. Browser tests
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repo and shared contract
+        uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '26'
           cache: npm
@@ -86,7 +140,7 @@ jobs:
 
       - name: Upload browser reports and failure traces
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: playwright-results
           path: |
@@ -96,17 +150,19 @@ jobs:
           retention-days: 14
 
   mutation:
+    name: 5. Mutation tests
+    needs: e2e
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Check out repository and contract
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repo and shared contract
+        uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '26'
           cache: npm
@@ -123,7 +179,7 @@ jobs:
 
       - name: Upload mutation analysis
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: mutation-results
           path: reports/mutation/

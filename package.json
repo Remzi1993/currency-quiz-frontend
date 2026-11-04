@@ -1,7 +1,7 @@
 {
   "name": "currency-quiz-frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "engines": {
     "node": ">=26.0.0"
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "typecheck": "vue-tsc -b && vue-tsc -p tsconfig.test.json",
+    "typecheck": "vue-tsc -b && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "preview": "vite preview",
     "test:watch": "vitest",
@@ -51,18 +51,6 @@
     },
     "@swagger-api/apidom-reference": {
       "minimatch": "^11.0.4"
-    },
-    "@stryker-mutator/core": {
-      "minimatch": "^11.0.4"
-    },
-    "js-beautify": {
-      "glob": "^14.0.3",
-      "editorconfig": {
-        "minimatch": "^11.0.4"
-      }
-    },
-    "typed-rest-client": {
-      "qs": "^6.17.1"
     },
     "typescript": "$typescript"
   }

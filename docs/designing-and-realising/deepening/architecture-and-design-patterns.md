@@ -1,4 +1,11 @@
 # Architecture and Design Patterns
+- **Knowledge article url:** https://boksa.hbo-ict-hva.nl/profiles/full-stack-developer/design-and-realise/architecture-and-design-patterns/
+- **Author:** Remzi Çavdar
+- **AI disclosure:** I used OpenAI Codex to assist in drafting this document by analysing my codebase, identifying
+  relevant implementations, and comparing my work against the AUAS BoKSA knowledge article. Codex helped structure and
+  formulate the documentation based on these findings. I independently reviewed, verified, and edited the generated
+  content to ensure it accurately reflects my work and understanding. I take full responsibility for the accuracy,
+  completeness, and quality of this document.
 
 The frontend separates rendering, quiz state, HTTP requests and browser persistence. A view can use quiz behaviour without handling request paths or storage formats itself.
 
@@ -18,12 +25,12 @@ The ADR records context, a decision and its consequences following [Nygard's lig
 
 ## Implementation evidence
 
-| Choice | Why it helps | Evidence |
-|--------|--------------|----------|
-| Logical layers | The view renders state, the composable coordinates a round, and the client communicates with the API. | [QuizView.vue](../../../src/views/QuizView.vue), [useQuiz.ts](../../../src/composables/useQuiz.ts), [client.ts](../../../src/api/client.ts) |
-| Small HTTP facade | `loadQuestions` and `submitAnswer` hide paths, serialization, response checks and error mapping behind simple operations. This follows the [Facade idea](https://refactoring.guru/design-patterns/facade). | [client.ts](../../../src/api/client.ts) |
-| Factory function and injected dependencies | `createQuizApi` creates a configured client with replaceable Fetch. `useQuiz` accepts service substitutes instead of requiring real network requests in tests. | [client.test.ts](../../../src/api/client.test.ts), [useQuiz.test.ts](../../../src/composables/useQuiz.test.ts) |
-| Separate persistence | Storage validation and serialization stay outside the view, and blocked storage can be handled independently. | [quizStorage.ts](../../../src/composables/quizStorage.ts) |
+| Choice                                     | Why it helps                                                                                                                                                                                               | Evidence                                                                                                                                    |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| Logical layers                             | The view renders state, the composable coordinates a round, and the client communicates with the API.                                                                                                      | [QuizView.vue](../../../src/views/QuizView.vue), [useQuiz.ts](../../../src/composables/useQuiz.ts), [client.ts](../../../src/api/client.ts) |
+| Small HTTP facade                          | `loadQuestions` and `submitAnswer` hide paths, serialization, response checks and error mapping behind simple operations. This follows the [Facade idea](https://refactoring.guru/design-patterns/facade). | [client.ts](../../../src/api/client.ts)                                                                                                     |
+| Factory function and injected dependencies | `createQuizApi` creates a configured client with replaceable Fetch. `useQuiz` accepts service substitutes instead of requiring real network requests in tests.                                             | [client.test.ts](../../../src/api/client.test.ts), [useQuiz.test.ts](../../../src/composables/useQuiz.test.ts)                              |
+| Separate persistence                       | Storage validation and serialization stay outside the view, and blocked storage can be handled independently.                                                                                              | [quizStorage.ts](../../../src/composables/quizStorage.ts)                                                                                   |
 
 ## Refactoring evidence and limits
 

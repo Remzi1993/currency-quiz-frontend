@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, useTemplateRef } from 'vue'
 import type { PublicQuestion } from '../../shared/generated/typescript/schema'
 import AppIcon from './AppIcon.vue'
 import { haveOptionsChanged, validateQuestionForm, type QuestionSubmission } from '../admin/questionForm.ts'
 
 const props = defineProps<{ question: PublicQuestion | null; saving: boolean; error: string }>()
-const emit = defineEmits<{ save: [submission: QuestionSubmission]; close: [] }>()
+const emit = defineEmits<{
+  (event: 'save', submission: QuestionSubmission): void
+  (event: 'close'): void
+}>()
 const editorId = useId()
-const dialog = ref<HTMLDialogElement | null>(null)
+const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const text = ref(props.question?.text ?? '')
 const optionRows = ref((props.question?.options ?? ['', '']).map((value, id) => ({ id, value })))
 const correctAnswerIndex = ref<number | null>(null)
@@ -67,7 +70,7 @@ async function save() {
     return
   }
   await nextTick()
-  dialog.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+  if (dialog.value) dialog.value.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
 }
 
 onMounted(() => {
@@ -161,13 +164,13 @@ onBeforeUnmount(() => {
               <button class="button is-ghost editor-remove" type="button" :disabled="optionRows.length <= 2" :aria-label="`Remove option ${index + 1}`" @click="removeOption(index)">
                 <AppIcon name="trash" />
               </button>
-              <p v-if="(submitted || touchedOptions.has(option.id)) && errors.optionErrors[index]" :id="`${editorId}-option-error-${option.id}`" class="editor-field-error">{{ errors.optionErrors[index] }}</p>
+              <p v-if="(submitted || touchedOptions.has(option.id)) && errors.optionErrors[index]" :id="`${editorId}-option-error-${option.id}`" class="editor-field-error" v-text="errors.optionErrors[index]"></p>
             </div>
           </div>
 
           <button class="button is-light editor-add" type="button" :disabled="optionRows.length >= 10" @click="addOption"><AppIcon name="plus" />Add option</button>
           <p v-if="submitted && errors.options" class="editor-field-error">{{ errors.options }}</p>
-          <p v-if="showAnswerError && errors.correctAnswer" :id="`${editorId}-answer-error`" class="editor-field-error">{{ errors.correctAnswer }}</p>
+          <p v-if="showAnswerError && errors.correctAnswer" :id="`${editorId}-answer-error`" class="editor-field-error" v-text="errors.correctAnswer"></p>
           <p class="editor-helper">Options can contain up to 200 characters each. Extra spaces at the beginning and end are removed when saving.</p>
         </fieldset>
 

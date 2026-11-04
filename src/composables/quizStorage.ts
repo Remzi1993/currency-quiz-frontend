@@ -30,8 +30,8 @@ export interface StoredQuizState {
 }
 
 function hasFields(value: unknown, fields: string[]): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && Object.keys(value).length === fields.length
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  return Object.keys(value).length === fields.length
     && fields.every((field) => Object.hasOwn(value, field))
 }
 

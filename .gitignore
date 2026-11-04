@@ -138,6 +138,12 @@ coverage
 # nyc test coverage
 .nyc_output
 
+# Vitest, Playwright and Stryker generated evidence
+reports/
+playwright-report/
+test-results/
+.stryker-tmp/
+
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 

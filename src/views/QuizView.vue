@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, useTemplateRef, watch } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 import CurrencyGlobe from '../components/CurrencyGlobe.vue'
 import { useQuiz } from '../composables/useQuiz.ts'
@@ -13,9 +13,9 @@ const {
 
 defineOptions({ name: 'QuizView' })
 
-const exitDialog = ref<HTMLDialogElement | null>(null)
-const panelHeading = ref<HTMLElement | null>(null)
-const feedback = ref<HTMLElement | null>(null)
+const exitDialog = useTemplateRef<HTMLDialogElement>('exitDialog')
+const panelHeading = useTemplateRef<HTMLElement>('panelHeading')
+const feedback = useTemplateRef<HTMLElement>('feedback')
 const now = ref(Date.now())
 const retrySeconds = computed(() => Math.max(0, Math.ceil(((retryAt.value ?? 0) - now.value) / 1000)))
 const scorePercent = computed(() => totalQuestions.value ? Math.round(correctCount.value / totalQuestions.value * 100) : 0)
@@ -123,7 +123,7 @@ onMounted(initialize)
               <div class="round-stat-incorrect"><dt>Incorrect</dt><dd>{{ incorrectCount }}</dd></div>
               <div class="round-stat-answered"><dt>Answered</dt><dd>{{ records.length }}</dd></div>
             </dl>
-            <div class="mini-progress" aria-hidden="true"><span v-for="record, index in records" :key="index" :class="record.correct ? 'is-correct' : 'is-incorrect'"></span><span v-if="!records.length" class="is-pending"></span></div>
+            <div class="mini-progress" aria-hidden="true"><span v-for="(record, index) in records" :key="index" :class="record.correct ? 'is-correct' : 'is-incorrect'"></span><span v-if="!records.length" class="is-pending"></span></div>
           </div>
         </template>
         <template v-else>
@@ -192,7 +192,7 @@ onMounted(initialize)
               <legend ref="panelHeading" class="panel-title question-title" tabindex="-1">{{ currentQuestion.text }}</legend>
               <p class="muted question-instruction" id="answer-instruction">One question. One answer. Go with what you know.</p>
               <div class="answer-options" aria-describedby="answer-instruction">
-                <label v-for="option, index in currentQuestion.options" :key="`${currentQuestion.id}-${option}`" class="answer-option" :class="{ 'is-selected': selectedAnswer === option, 'is-correct': selectedAnswer === option && answerResult?.correct, 'is-incorrect': selectedAnswer === option && answerResult?.correct === false }">
+                <label v-for="(option, index) in currentQuestion.options" :key="`${currentQuestion.id}-${option}`" class="answer-option" :class="{ 'is-selected': selectedAnswer === option, 'is-correct': selectedAnswer === option && answerResult?.correct, 'is-incorrect': selectedAnswer === option && answerResult?.correct === false }">
                   <input v-model="selectedAnswer" class="is-sr-only" type="radio" name="answer" :value="option" />
                   <span class="answer-letter">{{ String.fromCharCode(65 + index) }}</span>
                   <span class="answer-text"><strong>{{ option }}</strong></span>
@@ -227,7 +227,7 @@ onMounted(initialize)
           <details class="answer-review">
             <summary>Your round, in review <span>{{ records.length }} answers</span></summary>
             <ol>
-              <li v-for="record, index in records" :key="record.question.id">
+              <li v-for="(record, index) in records" :key="record.question.id">
                 <span class="review-number">{{ String(index + 1).padStart(2, '0') }}</span>
                 <div><p>{{ record.question.text }}</p><span>Your answer: <strong>{{ record.answer }}</strong></span></div>
                 <span class="review-outcome" :class="record.correct ? 'has-text-success' : 'has-text-danger'"><AppIcon :name="record.correct ? 'check' : 'close'" /><span class="is-sr-only">{{ record.correct ? 'Correct' : 'Incorrect' }}</span></span>

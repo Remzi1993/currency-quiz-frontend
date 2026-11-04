@@ -151,9 +151,41 @@ npm run build
 npm run preview
 ```
 
-`typecheck` checks the Vue application, standalone Swagger entry point, configuration, and tests. `test` uses Node's built-in test runner and native TypeScript support to verify the public and admin API clients, quiz state, saved-session handling, theme preferences and OS changes, cookie session restoration and expiry, refresh rotation and concurrency, question-form validation and partial updates, documentation example serialization, and Swagger's credential/header/origin handling without a running backend. The `yaml` development dependency lets the documentation tests read the shared OpenAPI file and compare the documented operations, response codes, and authentication with the actual contract. It is not used in the browser bundle. These tests do not establish compatibility with a running backend. `build` type-checks and creates the static application and `dist/swagger/index.html`; `preview` serves that build locally. Swagger's larger bundle is separate from the quiz bundle.
+`typecheck` uses Vue-aware TypeScript checking for the application, standalone Swagger entry point, configuration, and all tests. `test` runs Vitest once; `npm run test:watch` gives feedback while editing. The existing API, quiz state, persistence, theme, session, validation, documentation and Swagger tests are retained. Vue Test Utils and jsdom render the question editor to check its form behaviour, errors, focus and emitted requests. Existing strict Node assertions remain usable within Vitest.
+
+The `yaml`, `ajv` and `ajv-formats` development dependencies validate the public client's method, route, request body and responses against the pinned OpenAPI contract, including UUID formats and rejection of leaked answers. Run `npm run test:contract` for this boundary alone. These are specification-based consumer checks; they do not verify a running backend or a consumer-driven provider pact. None of the test tooling is imported by the browser application. `build` type-checks and creates the static application and `dist/swagger/index.html`; `preview` serves that build locally. Swagger's larger bundle is separate from the quiz bundle.
 
 Run these checks after updating the shared submodule. Its generated declarations now export named models such as `PublicQuestion` and `AnswerResponse`, without the former `components` or `paths` types. The frontend consumes these committed declarations and validates incoming JSON at runtime; no contract generation or Java installation is needed in this project. Endpoint metadata is maintained in the frontend and checked against the OpenAPI YAML by the tests. `npm run dev` transpiles TypeScript without typechecking, so a working development server alone does not confirm that a production build will pass.
+
+### Testing for DP3
+
+Vitest covers unit, integration, consumer contract and component behaviour. Playwright adds a small browser suite for quiz completion, saved rounds, pending requests, error recovery, rate limits and admin login/CRUD/logout. One E2E framework is sufficient; Cypress is not needed alongside Playwright. See the [test strategy](docs/testing-strategy.md) for scope, risks, environments, quality gates and assessment evidence still to collect.
+
+**PowerShell 7+ and Linux/Bash, from the frontend root:**
+
+```sh
+npx playwright install chromium
+npm run test:coverage
+npm run test:e2e
+npm run test:mutation
+node scripts/test-summary.mjs
+```
+
+On a clean **Linux/Bash** machine, install Chromium's system packages with `npx playwright install --with-deps chromium` instead of the browser-only install above. CI uses this form. Browser binaries are installed once and refreshed when Playwright is upgraded.
+
+Playwright owns Vite at `127.0.0.1:4173` in test mode and an HTTP fake at `127.0.0.1:18080`. Keep these ports free. It overrides developer API settings, refuses to reuse an existing server, gives each test separate browser storage and server data, and removes that data afterwards. It needs no running backend or real admin credentials. This verifies browser → Vue → fetch → Vite proxy → test API behaviour. It does not establish production hosting, real backend, database or refresh-token compatibility. Staging verification with the real backend remains separate work.
+
+| Command or artifact | Purpose |
+| --- | --- |
+| `npm run test:coverage` | V8 coverage with gates of 90% lines/statements, 85% functions and 80% branches for the explicitly listed logic modules and question editor; this is not whole-application coverage. |
+| `coverage/index.html`, `coverage/lcov.info`, `coverage/coverage-summary.json` | Human-readable coverage, editor/tool integration and CI metrics. |
+| `reports/vitest/` | JUnit and JSON results from each Vitest run. |
+| `npm run test:e2e:report` | Open Playwright's HTML report; failure traces and screenshots are retained under `test-results/`. |
+| `npm run test:mutation` | Stryker mutates `src/admin/questionForm.ts`; the build fails below a 75% mutation score, with an 85% improvement target. |
+| `reports/mutation/index.html`, `reports/mutation/mutation.json` | Inspect surviving mutations and identify missing assertions. This score applies only to question validation. |
+| `node scripts/test-summary.mjs [vitest\|e2e\|mutation\|all]` | Print metrics from existing reports; CI also appends them to the Actions job summary. Defaults to `all`; it does not run tests. |
+
+The scoped `minimatch`, `glob` and `qs` overrides in `package.json` select patched transitive dependencies used by Stryker and Vue Test Utils' formatter. They prevent the new testing tools from adding known moderate advisories. Recheck and remove the overrides when upstream dependencies adopt the patched versions; rerun component tests and mutation testing when changing them. The previously documented low-severity Swagger advisory remains. Stryker excludes generated coverage, reports and build artifacts from its sandbox so temporary files do not become test inputs or cause copy races.
 
 ## Clean URLs and hosting
 
@@ -202,9 +234,11 @@ TypeScript uses `target: "ESNext"` and `lib: ["ESNext", "DOM", "DOM.Iterable"]` 
 
 ## Continuous integration
 
-The [Frontend CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual Actions runs. It checks out the pinned `shared/` submodule, installs locked dependencies with Node.js 26, then runs type checking → tests → build. A failure prevents later steps from running. The workflow builds the application without deploying it or changing Netlify settings. See [CI/CD Basics](docs/managing-and-collaborating/starting-points/ci-cd-basics.md) for the workflow structure, stage order and log diagnosis.
+The [Frontend CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual Actions runs. Three independent jobs check out the pinned `shared/` submodule and install locked dependencies with Node.js 26: `checks` runs type checking → Vitest with coverage gates → build; `e2e` installs Chromium and runs the isolated Playwright flows; `mutation` runs the question-form mutation gate. TypeScript's strict checks provide static analysis; no standalone linter is configured. The workflow builds without deploying or changing Netlify settings. See [CI/CD Basics](docs/managing-and-collaborating/starting-points/ci-cd-basics.md).
 
-Actions are pinned to full commit IDs with release-version comments; update both together when upgrading. After committing and pushing the workflow, open **Actions → Frontend CI** to inspect a run. Manual runs become available from the default branch. To require successful checks before merging, add its `checks` status to the branch ruleset after the first run. Netlify deployment gates are configured separately.
+Each job adds metrics to its Actions summary and uploads available HTML, JSON and JUnit evidence even when a test fails. Artifacts are retained for 14 days. Download reports to compare failures, coverage and surviving mutants between runs; no historical dashboard service is configured. Local verification does not establish that the hosted workflow has run successfully.
+
+Actions are pinned to full commit IDs with release-version comments; update both together when upgrading. After committing and pushing the workflow, open **Actions → Frontend CI** to inspect a run. Manual runs become available from the default branch. To require successful checks before merging, add `checks`, `e2e` and `mutation` to the branch ruleset after the first run. Branch protection and Netlify deployment gates are configured separately.
 
 Run the same checks from the frontend root in **PowerShell 7+ and Linux/Bash**:
 

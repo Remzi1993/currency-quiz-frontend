@@ -1,4 +1,11 @@
 # Input Validation & Secure Coding
+- **Knowledge article url:** https://boksa.hbo-ict-hva.nl/profiles/full-stack-developer/design-and-realise/input-validation-and-secure-coding/
+- **Author:** Remzi Çavdar
+- **AI disclosure:** I used OpenAI Codex to assist in drafting this document by analysing my codebase, identifying
+  relevant implementations, and comparing my work against the AUAS BoKSA knowledge article. Codex helped structure and
+  formulate the documentation based on these findings. I independently reviewed, verified, and edited the generated
+  content to ensure it accurately reflects my work and understanding. I take full responsibility for the accuracy,
+  completeness, and quality of this document.
 
 I treat API responses and saved browser state as external input. These browser checks complement server-side validation in the backend.
 
@@ -13,4 +20,6 @@ Admin access and refresh credentials are HttpOnly cookies managed by the browser
 
 The review example illustrates a risk, not a bug found in the project. The interface displays plain text, so no rich-HTML sanitizer is implemented. [OWASP distinguishes safe text output from HTML sanitisation](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html). There is no SQL access in this frontend.
 
-Existing [client tests](../../../src/api/client.test.ts) check malformed responses and unexpected fields. Run `npm test` from the frontend root (PowerShell 7+ and Bash). Browser tests for stored or reflected XSS still need to be added; safe rendering patterns alone do not demonstrate complete XSS protection.
+Existing [client tests](../../../src/api/client.test.ts) check malformed responses and unexpected fields. 
+Run `npm test` from the frontend root (PowerShell 7+ and Bash). Browser tests for stored or reflected XSS still need to be added; 
+safe rendering patterns alone do not demonstrate complete XSS protection.

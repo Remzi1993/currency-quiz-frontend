@@ -1,14 +1,25 @@
 # CI/CD Basics
+- **Knowledge article url:** https://boksa.hbo-ict-hva.nl/profiles/full-stack-developer/manage-and-collaborating/ci-cd-basics/
+- **Author:** Remzi Çavdar
+- **AI disclosure:** I used OpenAI Codex to assist in drafting this document by analysing my codebase, identifying
+  relevant implementations, and comparing my work against the AUAS BoKSA knowledge article. Codex helped structure and
+  formulate the documentation based on these findings. I independently reviewed, verified, and edited the generated
+  content to ensure it accurately reflects my work and understanding. I take full responsibility for the accuracy,
+  completeness, and quality of this document.
 
-[Frontend CI](../../../.github/workflows/ci.yml) checks pushes to `main` and `dev`, including merges, all pull requests, and manual runs. Five jobs run in strict sequence through `needs` dependencies. Every job starts in a fresh Ubuntu workspace, recursively checks out the pinned shared contract, sets up Node.js 26 with npm caching, and runs `npm ci`. Repository permissions allow reads only; a newer run cancels an older run for the same workflow and ref.
+[Frontend CI](../../../.github/workflows/ci.yml) checks pushes to `main` and `dev`, including merges, all pull requests,
+and manual runs. Five jobs run in strict sequence through `needs` dependencies. 
+Every job starts in a fresh Ubuntu workspace, recursively checks out the pinned shared contract, 
+sets up Node.js 26 with npm caching, and runs `npm ci`. Repository permissions allow reads only; 
+a newer run cancels an older run for the same workflow and ref.
 
-| Stage and job ID | Checks and acceptance | Reports and artifacts |
-|-----|-----------------------|---------|
-| 1. Tests and coverage (`test`) | Run unit, component and contract tests with Vitest and collect coverage during test execution. Test failures or coverage below the configured thresholds fail the job. | Vitest JUnit and JSON, coverage HTML, LCOV and JSON summary. |
-| 2. Type check (`checks`) | After Vitest and its coverage gates succeed, check application, configuration and test types. | Compiler diagnostics in the job log. |
-| 3. Production build (`build`) | After type checking succeeds, validate the production bundle. | Upload `dist/` as `currency-quiz-build` after a successful build. |
-| 4. Browser tests (`e2e`) | After the build succeeds, install Chromium and run Playwright against its own Vite frontend and fake API. Any failing case fails the job; retries are disabled. | Playwright HTML, JSON and JUnit, with traces and screenshots for failures. |
-| 5. Mutation tests (`mutation`) | After browser tests succeed, run Stryker against question-form validation. A score below 75% fails the job; 85% is the improvement target. | Mutation HTML and JSON. |
+| Stage and job ID               | Checks and acceptance                                                                                                                                                  | Reports and artifacts                                                      |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| 1. Tests and coverage (`test`) | Run unit, component and contract tests with Vitest and collect coverage during test execution. Test failures or coverage below the configured thresholds fail the job. | Vitest JUnit and JSON, coverage HTML, LCOV and JSON summary.               |
+| 2. Type check (`checks`)       | After Vitest and its coverage gates succeed, check application, configuration and test types.                                                                          | Compiler diagnostics in the job log.                                       |
+| 3. Production build (`build`)  | After type checking succeeds, validate the production bundle.                                                                                                          | Upload `dist/` as `currency-quiz-build` after a successful build.          |
+| 4. Browser tests (`e2e`)       | After the build succeeds, install Chromium and run Playwright against its own Vite frontend and fake API. Any failing case fails the job; retries are disabled.        | Playwright HTML, JSON and JUnit, with traces and screenshots for failures. |
+| 5. Mutation tests (`mutation`) | After browser tests succeed, run Stryker against question-form validation. A score below 75% fails the job; 85% is the improvement target.                             | Mutation HTML and JSON.                                                    |
 
 Coverage gates require at least 80% aggregate lines, statements, functions and branches across the [selected source scope](../../../vitest.config.ts). Every metric must pass, but individual files do not each need 80% (`perFile: false`). This scope includes selected logic and `QuestionEditor`, rather than the whole application. Coverage is measured while tests execute and checked afterwards in the same run, so it cannot run as a standalone check before the tests. The [mutation configuration](../../../stryker.config.json) covers one module. These separate gates encourage checking relevant branches and assertions without treating a single high percentage as proof of correctness. TypeScript provides static checks; there is no separate lint stage.
 

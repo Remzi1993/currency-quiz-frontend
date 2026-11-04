@@ -107,6 +107,7 @@ test('adding and removing an option preserves selection and moves focus to the r
   await editor.get('[aria-label="Mark option 3 as the correct answer"]').setValue(true)
   await editor.get('[aria-label="Remove option 1"]').trigger('click')
 
+  expect(document.activeElement).toBe(editor.get('input[placeholder="Japanese yen"]').element)
   expect((editor.get('[aria-label="Mark option 2 as the correct answer"]').element as HTMLInputElement).checked).toBe(true)
   await editor.get('form').trigger('submit')
   expect(editor.emitted('save')).toEqual([[{

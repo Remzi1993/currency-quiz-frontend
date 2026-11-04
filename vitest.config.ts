@@ -6,10 +6,11 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
+    allowOnly: !process.env.CI,
     restoreMocks: true,
     clearMocks: true,
-    reporters: ['default', 'junit'],
-    outputFile: { junit: 'reports/vitest/junit.xml' },
+    reporters: ['default', 'junit', 'json'],
+    outputFile: { junit: 'reports/vitest/junit.xml', json: 'reports/vitest/results.json' },
     coverage: {
       provider: 'v8',
       include: [

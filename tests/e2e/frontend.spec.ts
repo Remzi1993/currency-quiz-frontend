@@ -7,7 +7,10 @@ async function chooseCorrectAnswer(page: Page) {
   await expect(page.getByRole('group', { name: /^Which currency is used/ })).toBeVisible()
   for (const candidate of seedQuestions) {
     if (await page.getByRole('group', { name: candidate.text, exact: true }).isVisible()) {
-      await page.getByRole('radio', { name: new RegExp(candidate.correctAnswer) }).check()
+      // The native radio is visually clipped; users click its visible label.
+      await page.getByRole('group', { name: candidate.text, exact: true })
+        .getByText(candidate.correctAnswer, { exact: true }).click()
+      await expect(page.getByRole('radio', { name: new RegExp(candidate.correctAnswer) })).toBeChecked()
       return
     }
   }
@@ -68,6 +71,10 @@ test('shows an HTTP loading failure and recovers only after a manual retry', asy
 })
 
 test('honours Retry-After without automatically repeating an answer submission', async ({ page, testApi }) => {
+  // Keep Date fixed while ordinary browser timers and rendering continue to run.
+  // A slow CI machine cannot consume the countdown before the disabled-state assertion.
+  const now = new Date('2026-01-01T12:00:00Z')
+  await page.clock.setFixedTime(now)
   await testApi.configure({ rateLimitNextAnswer: true })
   await page.goto('/')
   await page.getByRole('button', { name: 'Let’s play' }).click()
@@ -75,6 +82,8 @@ test('honours Retry-After without automatically repeating an answer submission',
   await page.getByRole('button', { name: 'Check my answer' }).click()
   await expect(page.getByRole('alert')).toContainText('A short pause')
   await expect(page.getByRole('button', { name: /^Try again in/ })).toBeDisabled()
+  expect((await testApi.state()).answers).toHaveLength(1)
+  await page.clock.setFixedTime(new Date(now.getTime() + 2_000))
   await expect(page.getByRole('button', { name: 'Try my answer again' })).toBeEnabled()
   expect((await testApi.state()).answers).toHaveLength(1)
   await page.getByRole('button', { name: 'Try my answer again' }).click()

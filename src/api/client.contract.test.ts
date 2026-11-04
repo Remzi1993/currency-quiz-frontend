@@ -3,7 +3,7 @@ import { Ajv, type AnySchema } from 'ajv'
 import addFormats from 'ajv-formats'
 import { parse } from 'yaml'
 import { expect, test } from 'vitest'
-import { ApiError, createQuizApi } from './client.ts'
+import { createQuizApi } from './client.ts'
 
 interface JsonOperation {
   operationId: string
@@ -98,8 +98,9 @@ test.each([
 ])('the schema and consumer both reject $name in a public response', async ({ payload }) => {
   expect(listResponse(payload)).toBe(false)
   const api = createQuizApi({ baseUrl: 'http://contract.test', fetch: async () => Response.json(payload) })
-  await expect(api.loadQuestions()).rejects.toThrow(ApiError)
-  await expect(api.loadQuestions()).rejects.toThrow('invalid questions')
+  await expect(api.loadQuestions()).rejects.toMatchObject({
+    name: 'ApiError', message: expect.stringContaining('invalid questions'),
+  })
 })
 
 test.each([
@@ -109,5 +110,7 @@ test.each([
 ])('the schema and consumer both reject $name in an answer response', async ({ payload }) => {
   expect(answerResponse(payload)).toBe(false)
   const api = createQuizApi({ baseUrl: 'http://contract.test', fetch: async () => Response.json(payload) })
-  await expect(api.submitAnswer(question.id, 'Euro')).rejects.toThrow('invalid answer result')
+  await expect(api.submitAnswer(question.id, 'Euro')).rejects.toMatchObject({
+    name: 'ApiError', message: expect.stringContaining('invalid answer result'),
+  })
 })

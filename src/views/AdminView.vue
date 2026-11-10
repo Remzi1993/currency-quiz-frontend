@@ -199,17 +199,10 @@ async function signOut() {
   } finally { isSigningOut.value = false }
 }
 
-function onUserActivity(event: Event) {
-  if (!event.isTrusted || document.visibilityState !== 'visible' || isSigningOut.value) return
-  void adminSession.recordActivity().catch(() => { /* Session state exposes errors and handles 401. */ })
-}
-const activityEvents = ['pointerdown', 'keydown', 'scroll', 'input'] as const
 onMounted(() => {
   void loadQuestions()
-  for (const type of activityEvents) document.addEventListener(type, onUserActivity, { passive: true, capture: true })
 })
 onBeforeUnmount(() => {
-  for (const type of activityEvents) document.removeEventListener(type, onUserActivity, { capture: true })
   loadController?.abort()
   writeController?.abort()
   deleteDialog.value?.close()
@@ -228,7 +221,7 @@ onBeforeUnmount(() => {
     </header>
     <p v-if="signOutError" class="notification admin-error" role="alert">{{ signOutError }}</p>
     <p v-if="adminSession.restoreError.value" class="notification admin-error" role="status">{{ adminSession.restoreError.value }}</p>
-    <p class="admin-helper">For your security, sessions end after at most 15 minutes without activity or 30 minutes overall.</p>
+    <p class="admin-helper">Access is renewed when you make changes. Sign in again when renewal expires or the sign-in limit is reached; the default limit is 24 hours.</p>
 
     <section class="box admin-surface admin-bank" aria-labelledby="question-bank-heading">
       <div class="admin-bank-heading">

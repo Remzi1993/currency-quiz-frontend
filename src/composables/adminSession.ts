@@ -5,7 +5,6 @@ import { getAdminApi, isBrowserSessionResponse, type AdminApi, type BrowserSessi
 export interface AdminSession {
   expiresAt: number
   accessExpiresAt: number
-  absoluteExpiresAt: number
   username: string
   csrfToken: string
 }
@@ -13,7 +12,7 @@ export interface AdminSession {
 /** Used only to remove sessions saved by older frontend versions. */
 export type AdminSessionStorage = Pick<Storage, 'removeItem'>
 interface AdminSessionOptions {
-  api?: Pick<AdminApi, 'getSession' | 'login' | 'logout' | 'refresh' | 'recordActivity'>
+  api?: Pick<AdminApi, 'getSession' | 'login' | 'logout' | 'refresh'>
   storage?: AdminSessionStorage | null
   now?: () => number
   schedule?: (callback: () => void, milliseconds: number) => () => void
@@ -27,7 +26,7 @@ function browserSessionStorage(): AdminSessionStorage | null {
 }
 
 function scheduleExpiry(callback: () => void, milliseconds: number): () => void {
-  const timer = globalThis.setTimeout(callback, milliseconds)
+  const timer = globalThis.setTimeout(callback, Math.min(milliseconds, 2_147_483_647))
   const hostTimer = timer as unknown as { unref?: () => void }
   hostTimer.unref?.()
   return () => globalThis.clearTimeout(timer)
@@ -54,8 +53,6 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
   let restored = false
   let restorePromise: Promise<AdminSession | null> | undefined
   let refreshPromise: Promise<string | null> | undefined
-  let activityPromise: Promise<void> | undefined
-  let lastReportedActivity = Number.NEGATIVE_INFINITY
   const api = () => options.api ?? getAdminApi()
 
   function removeLegacySession() {
@@ -73,8 +70,6 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
     generation++
     restorePromise = undefined
     refreshPromise = undefined
-    activityPromise = undefined
-    lastReportedActivity = Number.NEGATIVE_INFINITY
     isRestoring.value = false
     restored = true
     restoreError.value = ''
@@ -101,7 +96,7 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
 
   function accept(response: BrowserSessionResponse) {
     const timestamp = now()
-    if (!isBrowserSessionResponse(response) || !Number.isSafeInteger(timestamp + response.absoluteExpiresIn * 1000)) {
+    if (!isBrowserSessionResponse(response) || !Number.isSafeInteger(timestamp + response.expiresIn * 1000)) {
       throw new TypeError('The quiz service returned an invalid admin session. Please sign in again.')
     }
     const session: AdminSession = {
@@ -109,7 +104,6 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
       csrfToken: response.csrfToken,
       expiresAt: timestamp + response.expiresIn * 1000,
       accessExpiresAt: timestamp + response.accessExpiresIn * 1000,
-      absoluteExpiresAt: timestamp + response.absoluteExpiresIn * 1000,
     }
     state.value = session
     restoreError.value = ''
@@ -127,7 +121,7 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
         const checked = await api().getSession(signal)
         if (current !== generation || signal?.aborted) return null
         accept(checked)
-        // Another tab may already have rotated while this tab waited for the origin-wide lock.
+        // Another tab may already have renewed while this tab waited for the origin-wide lock.
         if (checked.accessExpiresIn <= 30) {
           const renewed = await api().refresh(checked.csrfToken, signal)
           if (current !== generation || signal?.aborted) return null
@@ -141,34 +135,6 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
     })
     refreshPromise = active
     const finish = () => { if (refreshPromise === active) refreshPromise = undefined }
-    void active.then(finish, finish)
-    return active
-  }
-
-  /** Called from trusted user input, never by polling or visibility/focus timers. */
-  function recordActivity(signal?: AbortSignal): Promise<void> {
-    if (activityPromise) return activityPromise
-    if (!getCsrfToken() || now() - lastReportedActivity < 30_000) return Promise.resolve()
-    const current = generation
-    const active = (async () => {
-      const csrf = await ensureAccess(signal)
-      if (!csrf || current !== generation || signal?.aborted) return
-      try {
-        const response = await api().recordActivity(csrf, signal)
-        if (current === generation && !signal?.aborted) {
-          accept(response)
-          lastReportedActivity = now()
-        }
-      } catch (cause) {
-        if (current === generation && !signal?.aborted) {
-          if (cause instanceof ApiError && cause.status === 401) invalidate()
-          else restoreError.value = cause instanceof Error ? cause.message : 'Your session activity could not be saved. Please try again.'
-        }
-        throw cause
-      }
-    })()
-    activityPromise = active
-    const finish = () => { if (activityPromise === active) activityPromise = undefined }
     void active.then(finish, finish)
     return active
   }
@@ -208,7 +174,6 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
   async function signIn(credentials: LoginRequest, signal?: AbortSignal) {
     const current = ++generation
     restorePromise = undefined
-    lastReportedActivity = Number.NEGATIVE_INFINITY
     isRestoring.value = false
     restored = true
     restoreError.value = ''
@@ -257,7 +222,7 @@ export function createAdminSession(options: AdminSessionOptions = {}) {
   removeLegacySession()
   return {
     state: readonly(state), restoreError: readonly(restoreError), isRestoring: readonly(isRestoring),
-    isAuthenticated, getCsrfToken, ensureAccess, recordActivity, restore, signIn, signOut, invalidate, dispose,
+    isAuthenticated, getCsrfToken, ensureAccess, restore, signIn, signOut, invalidate, dispose,
   }
 }
 

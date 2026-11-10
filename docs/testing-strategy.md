@@ -94,6 +94,17 @@ after forced refresh expiry. Type checking, production build and the ten specifi
 also passed. Coverage was 96.63% lines, 94.13% statements, 90.77% branches and 94.01% functions across the same selected
 scope. Mutation testing was not rerun for this authentication change; the question-form score above remains historical.
 
+An additional local smoke check on 10 November 2026 used headless Chromium, the real Vue frontend through Vite's
+proxy, and the packaged Ktor JAR with disposable bcrypt credentials and temporary JSON storage. Environment settings
+shortened access, refresh and absolute lifetimes to 2, 6 and 18 seconds. Five UI question creates at approximately
+3, 7, 11, 15 and 17 seconds after sign-in succeeded. Seven user-triggered renewals in total, including question-list
+loads after both sign-ins, replaced both HttpOnly cookies while preserving signed `auth_time` and `absolute_exp`.
+Both final token expiries were capped by the original 18-second deadline. A request without CSRF returned 403; a
+copied final refresh JWT returned 401 after the deadline. The UI returned to sign-in, a fresh login established a new
+`auth_time`, and logout cleared both cookies. No browser JavaScript errors were reported. This was an ad hoc local
+authentication smoke check, not a checked-in real-backend CI fixture or proof of a production deployment; the six
+maintained Playwright journeys still use the isolated fake API.
+
 These are local measurements. A separate local run limited to 12 tests deliberately failed all four 80% aggregate coverage thresholds and exited nonzero, confirming that the gate rejects insufficient coverage while preserving the full-suite reports. The configured GitHub workflow still needs an actual hosted run after the changes are pushed.
 
 Other useful improvements are targeted tests for the currently uncovered question-bank revision helper, cancellation/error paths in the public client, and theme/storage fallback decisions. Expand measured UI scope when additional components gain meaningful tests. Raise thresholds after reviewing sustained results rather than imposing 100% coverage and encouraging trivial assertions.

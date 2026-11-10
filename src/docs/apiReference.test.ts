@@ -66,6 +66,21 @@ test('public examples keep answers private and distinguish outcome checking from
   assert.match(endpoint('update-question').notes.join(' '), /non-null.*null fields.*previous/s)
 })
 
+test('browser examples expose only current token metadata and preserve renewal cookies', () => {
+  for (const id of ['create-session', 'get-session', 'refresh-session']) {
+    const body = endpoint(id).responseBody
+    assert.ok(body)
+    assert.deepEqual(Object.keys(body).sort(), ['accessExpiresIn', 'csrfToken', 'expiresIn', 'username'])
+    assert.equal('accessToken' in body || 'refreshToken' in body, false)
+  }
+
+  const examples = buildShellExamples('https://quiz.test', endpoint('refresh-session'))
+  assert.match(examples.bash!, /--cookie \.\/admin-cookies\.txt/)
+  assert.match(examples.bash!, /--cookie-jar \.\/admin-cookies\.txt/)
+  assert.match(examples.powershell!, /-WebSession \$adminWebSession/)
+  assert.equal(endpoints.some(({ path }) => path.endsWith('/activity')), false)
+})
+
 test('builds same-origin or configured-base URLs with encoded path parameters', () => {
   const entry = endpoint('get-question')
   assert.equal(buildEndpointUrl('', entry), `/api/v1/questions/${exampleQuestionId}`)

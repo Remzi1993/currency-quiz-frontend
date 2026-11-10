@@ -13,12 +13,12 @@ afterEach(() => {
 const credentials = { username: 'school-admin', password: 'example-only-password' }
 const noTimer = () => () => {}
 const metadata = (overrides: Partial<BrowserSessionResponse> = {}): BrowserSessionResponse => ({
-  username: 'school-admin', csrfToken: 'a'.repeat(43), expiresIn: 900,
-  accessExpiresIn: Math.min(300, overrides.expiresIn ?? 900), absoluteExpiresIn: 1800, ...overrides,
+  username: 'school-admin', csrfToken: 'a'.repeat(43), expiresIn: 600,
+  accessExpiresIn: Math.min(300, overrides.expiresIn ?? 600), ...overrides,
 })
-type SessionApi = Pick<AdminApi, 'getSession' | 'login' | 'logout' | 'refresh' | 'recordActivity'>
+type SessionApi = Pick<AdminApi, 'getSession' | 'login' | 'logout' | 'refresh'>
 function fakeApi(overrides: Partial<SessionApi> = {}): SessionApi {
-  return { login: async () => metadata(), getSession: async () => metadata(), logout: async () => {}, refresh: async () => metadata(), recordActivity: async () => metadata(), ...overrides }
+  return { login: async () => metadata(), getSession: async () => metadata(), logout: async () => {}, refresh: async () => metadata(), ...overrides }
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -44,7 +44,7 @@ test('keeps only readonly metadata and CSRF in memory and removes legacy credent
   await session.signIn(credentials)
   assert.equal(isReadonly(session.state), true)
   assert.equal(isReadonly(session.state.value), true)
-  assert.deepEqual(session.state.value, { username: 'school-admin', csrfToken: 'a'.repeat(43), expiresAt: 901_000, accessExpiresAt: 301_000, absoluteExpiresAt: 1_801_000 })
+  assert.deepEqual(session.state.value, { username: 'school-admin', csrfToken: 'a'.repeat(43), expiresAt: 601_000, accessExpiresAt: 301_000 })
   assert.equal(session.getCsrfToken(), 'a'.repeat(43))
   assert.deepEqual([...values], [['unrelated-preference', 'keep']])
   assert.equal(Object.hasOwn(session.state.value!, 'accessToken'), false)
@@ -100,7 +100,7 @@ test('sign-in verifies cookie acceptance and explains blocked cookies without au
   await assert.rejects(invalid.signIn(credentials), /Incorrect password/)
 })
 
-test('sign-out revokes on the server before clearing memory and failures preserve a retryable session', async () => {
+test('sign-out clears server cookies before clearing memory and failures preserve a retryable session', async () => {
   let fail = true
   let requests = 0
   const session = createAdminSession({ api: fakeApi({ logout: async (csrf) => { requests++; assert.equal(csrf, 'a'.repeat(43)); if (fail) throw new ApiError('Network unavailable') } }), schedule: noTimer })
@@ -114,7 +114,7 @@ test('sign-out revokes on the server before clearing memory and failures preserv
   assert.equal(session.getCsrfToken(), null)
 })
 
-test('401 during sign-out means the server session has already ended', async () => {
+test('401 during sign-out means the server credentials have already expired', async () => {
   const session = createAdminSession({ api: fakeApi({ logout: async () => { throw new ApiError('Expired', { status: 401 }) } }), schedule: noTimer })
   await session.signIn(credentials)
   await session.signOut()
@@ -198,7 +198,7 @@ test('stale logins and cancelled or disposed checks cannot resurrect authenticat
 })
 
 test('invalid session metadata and exposed bearer fields cannot establish a session', async () => {
-  for (const value of [null, {}, { ...metadata(), accessToken: 'must-not-be-exposed' }, { ...metadata(), csrfToken: 'bad' }, { ...metadata(), expiresIn: 0 }, { ...metadata(), expiresIn: 901 }, { ...metadata(), username: '' }]) {
+  for (const value of [null, {}, { ...metadata(), accessToken: 'must-not-be-exposed' }, { ...metadata(), csrfToken: 'bad' }, { ...metadata(), expiresIn: 0 }, { ...metadata(), expiresIn: 2_147_483_648 }, { ...metadata(), username: '' }]) {
     const invalid = value as BrowserSessionResponse
     const login = createAdminSession({ api: fakeApi({ login: async () => invalid }), schedule: noTimer })
     await assert.rejects(login.signIn(credentials), TypeError)
@@ -226,46 +226,60 @@ test('blocked storage and SSR do not prevent cookie sessions or read localStorag
   }
 })
 
-test('access expiry never polls or refreshes in the background and idle expiry signs out', async () => {
+test('access expiry never renews in the background and refresh expiry signs out', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
   vi.setSystemTime(1000)
   let refreshes = 0
-  let activities = 0
-  const session = createAdminSession({ api: fakeApi({ refresh: async () => { refreshes++; return metadata() }, recordActivity: async () => { activities++; return metadata() } }) })
+  const session = createAdminSession({ api: fakeApi({ refresh: async () => { refreshes++; return metadata() } }) })
   onTestFinished(() => session.dispose())
   await session.signIn(credentials)
   vi.advanceTimersByTime(300_000)
   assert.equal(session.isAuthenticated.value, true)
-  assert.equal(refreshes, 0); assert.equal(activities, 0)
-  vi.advanceTimersByTime(600_000)
+  assert.equal(refreshes, 0)
+  vi.advanceTimersByTime(300_000)
   assert.equal(session.isAuthenticated.value, false)
-  assert.equal(refreshes, 0); assert.equal(activities, 0)
+  assert.equal(refreshes, 0)
 })
 
-test('a user request coalesces refresh and preserves deadlines until explicit activity', async () => {
+test('user operations coalesce renewal and accept rolling or shortened refresh lifetimes', async () => {
   let now = 1000
   let server = metadata()
   let refreshes = 0
-  let activities = 0
-  const session = createAdminSession({ now: () => now, schedule: noTimer, api: fakeApi({ getSession: async () => server, refresh: async () => { refreshes++; return server = metadata({ expiresIn: 600, absoluteExpiresIn: 1500 }) }, recordActivity: async () => { activities++; return server = metadata({ expiresIn: 900, absoluteExpiresIn: 1500 }) } }) })
+  let remaining = 600
+  const session = createAdminSession({ now: () => now, schedule: noTimer, api: fakeApi({
+    getSession: async () => server,
+    refresh: async () => { refreshes++; return server = metadata({ expiresIn: remaining }) },
+  }) })
   await session.signIn(credentials)
-  now += 300_000
-  server = metadata({ expiresIn: 600, accessExpiresIn: 0, absoluteExpiresIn: 1500 })
-  const first = session.ensureAccess()
-  assert.equal(session.ensureAccess(), first)
-  assert.equal(await first, 'a'.repeat(43))
-  assert.equal(refreshes, 1); assert.equal(activities, 0)
-  assert.equal(session.state.value?.expiresAt, 901_000)
-  assert.equal(session.state.value?.absoluteExpiresAt, 1_801_000)
-  await session.recordActivity()
-  assert.equal(activities, 1)
-  assert.equal(session.state.value?.expiresAt, 1_201_000)
-  await session.recordActivity()
-  assert.equal(activities, 1, 'No trailing timer or excessive activity reports')
+  for (const lifetime of [600, 600, 20]) {
+    now += 300_000
+    server = metadata({ expiresIn: 300, accessExpiresIn: 0 })
+    remaining = lifetime
+    const first = session.ensureAccess()
+    assert.equal(session.ensureAccess(), first)
+    assert.equal(await first, 'a'.repeat(43))
+    assert.equal(session.state.value?.expiresAt, now + lifetime * 1000)
+    assert.equal(session.state.value?.accessExpiresAt, now + Math.min(300, lifetime) * 1000)
+  }
+  assert.equal(refreshes, 3)
+  now += 20_000
+  assert.equal(session.getCsrfToken(), null)
+  assert.equal(session.isAuthenticated.value, false)
+  assert.equal(refreshes, 3)
   session.dispose()
 })
 
-test('two tabs serialize rotation and check cookies again before spending a refresh token', async () => {
+test('long configured refresh lifetimes use bounded browser timers', async () => {
+  vi.useFakeTimers()
+  const timer = vi.spyOn(globalThis, 'setTimeout')
+  const session = createAdminSession({ api: fakeApi({ getSession: async () => metadata({ expiresIn: 2_147_483_647 }) }) })
+  onTestFinished(() => session.dispose())
+  await session.signIn(credentials)
+  assert.equal(session.isAuthenticated.value, true)
+  assert.equal(timer.mock.calls.at(-1)?.[1], 2_147_483_647)
+})
+
+test('two tabs serialize renewal and check current cookies before another refresh', async () => {
   const lock = originLock()
   let server = metadata({ accessExpiresIn: 0 })
   let refreshes = 0
@@ -278,7 +292,7 @@ test('two tabs serialize rotation and check cookies again before spending a refr
   first.dispose(); second.dispose()
 })
 
-test('logout waits for rotation so a late refresh cannot restore cookies', async () => {
+test('logout waits for renewal so a late refresh cannot restore cookies', async () => {
   const lock = originLock()
   const refresh = deferred<BrowserSessionResponse>()
   const started = deferred<void>()
@@ -295,7 +309,7 @@ test('logout waits for rotation so a late refresh cannot restore cookies', async
   assert.equal(session.state.value, null)
 })
 
-test('rejected refresh clears authentication but an uncertain refresh is not automatically retried', async () => {
+test('expired or absolute-limit refresh clears authentication without retrying uncertain failures', async () => {
   for (const status of [401, 503, undefined]) {
     let calls = 0
     const session = createAdminSession({ schedule: noTimer, api: fakeApi({ getSession: async () => metadata({ accessExpiresIn: 0 }), refresh: async () => { calls++; throw new ApiError('Refresh failed', status === undefined ? {} : { status }) } }) })

@@ -25,6 +25,7 @@ export const seedQuestions: AdminQuestion[] = [
 export const testCredentials = { username: 'e2e-admin', password: 'e2e-only-password' }
 
 export interface ApiState {
+  refreshes: number
   listReads: number
   answers: Array<{ questionId: string; answer: string }>
   mutations: Array<{ method: string; body: unknown }>
@@ -32,6 +33,8 @@ export interface ApiState {
 }
 
 export interface ApiScenario {
+  expireAccess?: boolean
+  expireRefresh?: boolean
   failNextList?: boolean
   rateLimitNextAnswer?: boolean
   holdAnswers?: boolean

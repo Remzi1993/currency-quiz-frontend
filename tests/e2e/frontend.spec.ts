@@ -91,7 +91,7 @@ test('honours Retry-After without automatically repeating an answer submission',
   expect((await testApi.state()).answers).toHaveLength(2)
 })
 
-test('protects admin routes and creates, edits, deletes and signs out with a cookie session', async ({ page, testApi }) => {
+test('protects admin routes and renews both cookies before creating, editing, deleting and signing out', async ({ page, context, testApi }) => {
   await page.goto('/admin')
   await expect(page).toHaveURL(/\/admin\/login$/)
   await page.getByRole('textbox', { name: 'Username' }).fill(testCredentials.username)
@@ -102,6 +102,8 @@ test('protects admin routes and creates, edits, deletes and signs out with a coo
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page).toHaveURL(/\/admin$/)
   await expect(page.getByRole('status').filter({ hasText: 'Showing' })).toHaveText('Showing 3 of 3 questions')
+  const originalCookies = await context.cookies()
+  await testApi.configure({ expireAccess: true })
   await page.reload()
   await expect(page.getByRole('button', { name: 'Create question', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Create question', exact: true }).click()
@@ -112,6 +114,15 @@ test('protects admin routes and creates, edits, deletes and signs out with a coo
   await editor.getByRole('radio', { name: 'Mark option 1 as the correct answer' }).check()
   await editor.getByRole('button', { name: 'Create question', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Question created.' })).toBeVisible()
+  expect((await testApi.state()).refreshes).toBe(1)
+  const renewedCookies = await context.cookies()
+  for (const name of ['currency_quiz_admin', 'currency_quiz_admin_refresh']) {
+    const original = originalCookies.find((cookie) => cookie.name === name)
+    const renewed = renewedCookies.find((cookie) => cookie.name === name)
+    expect(original).toBeDefined()
+    expect(renewed?.httpOnly).toBe(true)
+    expect(renewed?.value).not.toBe(original?.value)
+  }
   await page.getByRole('searchbox', { name: 'Search questions' }).fill('Switzerland')
   await expect(page.getByRole('row').filter({ hasText: 'Which currency is used in Switzerland?' })).toHaveCount(1)
   await page.getByRole('button', { name: 'Edit question: Which currency is used in Switzerland?' }).click()
@@ -134,4 +145,16 @@ test('protects admin routes and creates, edits, deletes and signs out with a coo
   await expect(page).toHaveURL(/\/admin\/login\?reason=signed-out$/)
   await page.goto('/admin')
   await expect(page).toHaveURL(/\/admin\/login$/)
+})
+
+test('expired refresh requires sign-in again instead of background renewal', async ({ page, testApi }) => {
+  await page.goto('/admin/login')
+  await page.getByRole('textbox', { name: 'Username' }).fill(testCredentials.username)
+  await page.getByLabel('Password', { exact: true }).fill(testCredentials.password)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page).toHaveURL(/\/admin$/)
+  await testApi.configure({ expireAccess: true, expireRefresh: true })
+  await page.reload()
+  await expect(page).toHaveURL(/\/admin\/login$/)
+  expect((await testApi.state()).refreshes).toBe(0)
 })

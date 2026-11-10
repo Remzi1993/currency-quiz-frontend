@@ -9,6 +9,8 @@ interface Tenant extends ApiScenario {
   questions: AdminQuestion[]
   signedIn: boolean
   csrfToken: string
+  accessToken: string
+  refreshToken: string
   state: ApiState
   pendingAnswers: Array<() => void>
 }
@@ -35,7 +37,16 @@ function cookies(request: IncomingMessage): Record<string, string> {
 
 function session(tenant: Tenant): BrowserSessionResponse {
   return { username: testCredentials.username, csrfToken: tenant.csrfToken,
-    expiresIn: 900, accessExpiresIn: 300, absoluteExpiresIn: 1800 }
+    expiresIn: tenant.expireRefresh ? 300 : 600, accessExpiresIn: tenant.expireAccess ? 0 : 300 }
+}
+
+function issueCookies(response: ServerResponse, tenant: Tenant) {
+  tenant.accessToken = randomUUID()
+  tenant.refreshToken = randomUUID()
+  response.setHeader('Set-Cookie', [
+    `currency_quiz_admin=${tenant.accessToken}; HttpOnly; SameSite=Strict; Path=/api/v1; Max-Age=300`,
+    `currency_quiz_admin_refresh=${tenant.refreshToken}; HttpOnly; SameSite=Strict; Path=/api/v1/auth/session; Max-Age=600`,
+  ])
 }
 
 function publicQuestion({ id, text, options }: AdminQuestion) { return { id, text, options } }
@@ -50,7 +61,8 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
     if (method === 'POST') {
       const questions = structuredClone(seedQuestions)
       tenants.set(controlId, { questions, signedIn: false, csrfToken: randomBytes(32).toString('base64url'),
-        state: { listReads: 0, answers: [], mutations: [], questionCount: questions.length }, pendingAnswers: [] })
+        accessToken: '', refreshToken: '',
+        state: { refreshes: 0, listReads: 0, answers: [], mutations: [], questionCount: questions.length }, pendingAnswers: [] })
       return json(response, 201)
     }
     const tenant = tenants.get(controlId)
@@ -66,6 +78,8 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
       tenant.failNextList = scenario.failNextList === true
       tenant.rateLimitNextAnswer = scenario.rateLimitNextAnswer === true
       tenant.holdAnswers = scenario.holdAnswers === true
+      if (typeof scenario.expireAccess === 'boolean') tenant.expireAccess = scenario.expireAccess
+      if (typeof scenario.expireRefresh === 'boolean') tenant.expireRefresh = scenario.expireRefresh
       if (!tenant.holdAnswers) tenant.pendingAnswers.splice(0).forEach((release) => release())
       return json(response, 204)
     }
@@ -77,24 +91,24 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
   const tenant = tenantId ? tenants.get(tenantId) : undefined
   if (!tenant) return json(response, 409, { message: 'Test tenant was not seeded.' })
 
-  const authenticated = tenant.signedIn && browserCookies.currency_quiz_admin === tenantId
-  const validWrite = authenticated && request.headers['x-csrf-token'] === tenant.csrfToken
-    && request.headers.origin === appOrigin
+  const authenticated = tenant.signedIn && !tenant.expireAccess && browserCookies.currency_quiz_admin === tenant.accessToken
+  const renewable = tenant.signedIn && !tenant.expireRefresh && browserCookies.currency_quiz_admin_refresh === tenant.refreshToken
+  const validCsrf = request.headers['x-csrf-token'] === tenant.csrfToken && request.headers.origin === appOrigin
+  const validWrite = authenticated && validCsrf
   if (path === '/api/v1/auth/session') {
     if (method === 'POST') {
       const body = await readBody(request)
       if (request.headers.origin !== appOrigin) return json(response, 403)
       if (body.username !== testCredentials.username || body.password !== testCredentials.password) return json(response, 401)
       tenant.signedIn = true
-      response.setHeader('Set-Cookie', [
-        `currency_quiz_admin=${tenantId}; HttpOnly; SameSite=Strict; Path=/api/v1`,
-        `currency_quiz_admin_refresh=${tenantId}; HttpOnly; SameSite=Strict; Path=/api/v1/auth/session`,
-      ])
+      tenant.expireAccess = false
+      tenant.expireRefresh = false
+      issueCookies(response, tenant)
       return json(response, 200, session(tenant))
     }
-    if (method === 'GET') return json(response, authenticated ? 200 : 401, authenticated ? session(tenant) : undefined)
+    if (method === 'GET') return json(response, authenticated || renewable ? 200 : 401, authenticated || renewable ? session(tenant) : undefined)
     if (method === 'DELETE') {
-      if (!validWrite) return json(response, authenticated ? 403 : 401)
+      if (!(authenticated || renewable) || !validCsrf) return json(response, authenticated || renewable ? 403 : 401)
       tenant.signedIn = false
       response.setHeader('Set-Cookie', [
         'currency_quiz_admin=; HttpOnly; SameSite=Strict; Path=/api/v1; Max-Age=0',
@@ -103,8 +117,12 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
       return json(response, 204)
     }
   }
-  if (path === '/api/v1/auth/session/activity' && method === 'POST') {
-    return json(response, validWrite ? 200 : 403, validWrite ? session(tenant) : undefined)
+  if (path === '/api/v1/auth/session/refresh' && method === 'POST') {
+    if (!renewable || !validCsrf) return json(response, renewable ? 403 : 401)
+    tenant.expireAccess = false
+    tenant.state.refreshes++
+    issueCookies(response, tenant)
+    return json(response, 200, session(tenant))
   }
   if (path === '/api/v1/questions') {
     if (method === 'GET') {

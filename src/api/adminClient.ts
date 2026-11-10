@@ -23,16 +23,14 @@ function isAdminQuestion(value: unknown): value is AdminQuestion {
 }
 
 export function isBrowserSessionResponse(value: unknown): value is BrowserSessionResponse {
-  return isRecord(value) && Object.keys(value).length === 5
+  return isRecord(value) && Object.keys(value).length === 4
     && typeof value.username === 'string' && value.username.length >= 1 && value.username.length <= 100
     && value.username === value.username.trim()
     && typeof value.csrfToken === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value.csrfToken)
     && typeof value.expiresIn === 'number' && Number.isInteger(value.expiresIn)
-    && value.expiresIn >= 1 && value.expiresIn <= 900
+    && value.expiresIn >= 1 && value.expiresIn <= 2_147_483_647
     && typeof value.accessExpiresIn === 'number' && Number.isInteger(value.accessExpiresIn)
-    && value.accessExpiresIn >= 0 && value.accessExpiresIn <= Math.min(300, value.expiresIn)
-    && typeof value.absoluteExpiresIn === 'number' && Number.isInteger(value.absoluteExpiresIn)
-    && value.absoluteExpiresIn >= value.expiresIn && value.absoluteExpiresIn <= 1800
+    && value.accessExpiresIn >= 0 && value.accessExpiresIn <= value.expiresIn
 }
 
 async function validationDetails(response: Response): Promise<string> {
@@ -157,14 +155,6 @@ export function createAdminApi(options: { baseUrl?: string; fetch?: typeof globa
       return request(async () => {
         const data = await json(await send('/api/v1/auth/session/refresh', 'POST', 15_000, signal, csrfToken), 200)
         if (!isBrowserSessionResponse(data)) throw new ApiError('The quiz service returned an invalid session refresh. Please sign in again.')
-        return data
-      })
-    },
-
-    recordActivity(csrfToken: string, signal?: AbortSignal): Promise<BrowserSessionResponse> {
-      return request(async () => {
-        const data = await json(await send('/api/v1/auth/session/activity', 'POST', 15_000, signal, csrfToken), 200)
-        if (!isBrowserSessionResponse(data)) throw new ApiError('The quiz service returned invalid session metadata. Please sign in again.')
         return data
       })
     },

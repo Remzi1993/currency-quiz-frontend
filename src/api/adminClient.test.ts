@@ -11,7 +11,7 @@ afterEach(() => {
 const question = { id: 'c72b3aab-633f-4268-88e7-c6ba1c3bb217', text: 'Which currency is used in Japan?', options: ['Chinese yuan', 'Japanese yen', 'South Korean won', 'Thai baht'] }
 const adminQuestion = { ...question, correctAnswer: 'Japanese yen' }
 const csrfToken = 'a'.repeat(43)
-const sessionResponse = { username: 'example-admin', csrfToken, expiresIn: 900, accessExpiresIn: 300, absoluteExpiresIn: 1800 }
+const sessionResponse = { username: 'example-admin', csrfToken, expiresIn: 600, accessExpiresIn: 300 }
 const credentials = { username: 'example-admin', password: 'example-only-password' }
 const createBody: CreateQuestionRequest = { text: question.text, options: question.options, correctAnswer: 'Japanese yen' }
 function withResponse(body: unknown, init?: ResponseInit): AdminApi {
@@ -40,13 +40,11 @@ test('browser operations use cookies, no Authorization, no cache, and CSRF only 
   await api.deleteQuestion(csrfToken, 'id/with ?#')
   await api.logout(csrfToken)
   assert.deepEqual(await api.refresh(csrfToken), sessionResponse)
-  assert.deepEqual(await api.recordActivity(csrfToken), sessionResponse)
   assert.deepEqual(calls.map(({ method, url }) => [method, url]), [
     ['POST', 'https://quiz.test/backend/api/v1/auth/session'], ['GET', 'https://quiz.test/backend/api/v1/auth/session'],
     ['GET', 'https://quiz.test/backend/api/v1/questions'], ['POST', 'https://quiz.test/backend/api/v1/questions'],
     ['PATCH', 'https://quiz.test/backend/api/v1/questions/id%2Fwith%20%3F%23'], ['DELETE', 'https://quiz.test/backend/api/v1/questions/id%2Fwith%20%3F%23'],
     ['DELETE', 'https://quiz.test/backend/api/v1/auth/session'], ['POST', 'https://quiz.test/backend/api/v1/auth/session/refresh'],
-    ['POST', 'https://quiz.test/backend/api/v1/auth/session/activity'],
   ])
   assert.deepEqual(await calls[0]!.json(), credentials)
   assert.deepEqual(await calls[3]!.json(), createBody)
@@ -77,17 +75,17 @@ test('validates closed session metadata without accepting exposed bearer credent
     { ...sessionResponse, username: ' padded ' }, { ...sessionResponse, username: 'x'.repeat(101) },
     { ...sessionResponse, csrfToken: '' }, { ...sessionResponse, csrfToken: 'x'.repeat(42) },
     { ...sessionResponse, csrfToken: 'x'.repeat(44) }, { ...sessionResponse, csrfToken: '!'.repeat(43) },
-    { ...sessionResponse, expiresIn: 0 }, { ...sessionResponse, expiresIn: 901 },
-    { ...sessionResponse, accessExpiresIn: 301 }, { ...sessionResponse, accessExpiresIn: -1 },
-    { ...sessionResponse, expiresIn: 1 }, { ...sessionResponse, absoluteExpiresIn: 899 },
-    { ...sessionResponse, absoluteExpiresIn: 1801 }, { ...sessionResponse, expiresIn: 1.5 },
+    { ...sessionResponse, expiresIn: 0 }, { ...sessionResponse, expiresIn: 2_147_483_648 },
+    { ...sessionResponse, accessExpiresIn: 601 }, { ...sessionResponse, accessExpiresIn: -1 },
+    { ...sessionResponse, expiresIn: 1 }, { ...sessionResponse, absoluteExpiresIn: 1800 },
+    { ...sessionResponse, expiresIn: Number.NaN }, { ...sessionResponse, expiresIn: 1.5 },
     { ...sessionResponse, expiresIn: '900' }, { ...sessionResponse, extra: true },
   ]) {
     await assert.rejects(withResponse(payload).login(credentials), /invalid login response/)
     await assert.rejects(withResponse(payload).getSession(), /invalid session response/)
   }
-  for (const expiresIn of [1, 900]) {
-    const payload = { ...sessionResponse, expiresIn, accessExpiresIn: Math.min(300, expiresIn) }
+  for (const expiresIn of [1, 600, 3600, 2_147_483_647]) {
+    const payload = { ...sessionResponse, expiresIn, accessExpiresIn: Math.min(3600, expiresIn) }
     assert.deepEqual(await withResponse(payload).login(credentials), payload)
     assert.deepEqual(await withResponse(payload).getSession(), payload)
   }
@@ -156,7 +154,7 @@ test('preserves HTTP statuses for hosting HTML or broken bodies and only 503 men
 
 test('rate limits retain Retry-After and no writes or refreshes are automatically retried', async () => {
   const methods: Array<(api: AdminApi) => Promise<unknown>> = [
-    (api) => api.login(credentials), (api) => api.logout(csrfToken), (api) => api.refresh(csrfToken), (api) => api.recordActivity(csrfToken),
+    (api) => api.login(credentials), (api) => api.logout(csrfToken), (api) => api.refresh(csrfToken),
     (api) => api.createQuestion(csrfToken, createBody), (api) => api.updateQuestion(csrfToken, question.id, {}), (api) => api.deleteQuestion(csrfToken, question.id),
   ]
   for (const method of methods) {
@@ -174,7 +172,7 @@ test('combines caller cancellation with bounded login, read, session and write t
   const methods: Array<(api: AdminApi, signal: AbortSignal) => Promise<unknown>> = [
     (api, signal) => api.login(credentials, signal), (api, signal) => api.getSession(signal),
     (api, signal) => api.listQuestions(signal), (api, signal) => api.logout(csrfToken, signal),
-    (api, signal) => api.refresh(csrfToken, signal), (api, signal) => api.recordActivity(csrfToken, signal),
+    (api, signal) => api.refresh(csrfToken, signal),
     (api, signal) => api.createQuestion(csrfToken, createBody, signal), (api, signal) => api.updateQuestion(csrfToken, question.id, {}, signal), (api, signal) => api.deleteQuestion(csrfToken, question.id, signal),
   ]
   for (const method of methods) {
@@ -183,7 +181,7 @@ test('combines caller cancellation with bounded login, read, session and write t
     const api = createAdminApi({ baseUrl: 'https://quiz.test', fetch: async (input) => { assert.ok(input instanceof Request); caller.abort(reason); assert.equal(input.signal.aborted, true); assert.equal(input.signal.reason, reason); throw input.signal.reason } })
     await assert.rejects(method(api, caller.signal), (cause: unknown) => { assert.ok(cause instanceof ApiError); assert.equal(cause.cause, reason); return true })
   }
-  assert.deepEqual(deadlines, [60_000, 60_000, 60_000, 15_000, 15_000, 15_000, 15_000, 15_000, 15_000])
+  assert.deepEqual(deadlines, [60_000, 60_000, 60_000, 15_000, 15_000, 15_000, 15_000, 15_000])
   const reason = new DOMException('Timed out', 'TimeoutError')
   const api = createAdminApi({ baseUrl: 'https://quiz.test', fetch: async (input) => { assert.ok(input instanceof Request); timeoutControllers.at(-1)!.abort(reason); assert.equal(input.signal.reason, reason); throw input.signal.reason } })
   await assert.rejects(api.login(credentials, new AbortController().signal), (cause: unknown) => { assert.ok(cause instanceof ApiError); assert.equal(cause.cause, reason); assert.match(cause.message, /too long/); assert.doesNotMatch(cause.message, /Render/); return true })

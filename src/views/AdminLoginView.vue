@@ -112,7 +112,7 @@ onBeforeUnmount(() => {
         </button>
         <p v-if="isSigningIn" class="admin-helper" role="status">Signing in. Please wait for the service to respond.</p>
       </form>
-      <p class="admin-session-note">Your sign-in ends after at most 15 minutes without activity, 30 minutes overall, or a service restart. Your password is never saved by this website.</p>
+      <p class="admin-session-note">By default, access lasts 5 minutes and renewal is available for 10 minutes after sign-in or renewal, within a 24-hour sign-in limit. Your password is never saved by this website.</p>
     </section>
   </main>
 </template>

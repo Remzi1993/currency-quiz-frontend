@@ -10,7 +10,7 @@ interface EndpointDetails {
   group: 'Public quiz' | 'Administration'
   description: string
   auth: boolean
-  browserSession?: 'create' | 'read' | 'delete' | 'refresh' | 'activity'
+  browserSession?: 'create' | 'read' | 'delete' | 'refresh'
   notes: string[]
   parameters?: Array<{ name: string; description: string; required: boolean; example: string }>
 }
@@ -42,7 +42,6 @@ export type ApiEndpoint =
   | DocumentedOperation<'get-session', 'GET', '/api/v1/auth/session', BrowserSessionResponse, 200, 401 | 403 | 500>
   | DocumentedOperation<'delete-session', 'DELETE', '/api/v1/auth/session', never, 204, 401 | 403 | 500>
   | DocumentedOperation<'refresh-session', 'POST', '/api/v1/auth/session/refresh', BrowserSessionResponse, 200, 401 | 403 | 429 | 500>
-  | DocumentedOperation<'session-activity', 'POST', '/api/v1/auth/session/activity', BrowserSessionResponse, 200, 401 | 403 | 429 | 500>
   | DocumentedOperation<'create-question', 'POST', '/api/v1/questions', AdminQuestion, 201, 400 | 401 | 403 | 415 | 500, CreateQuestionRequest>
   | DocumentedOperation<'update-question', 'PATCH', '/api/v1/questions/{id}', AdminQuestion, 200, 400 | 401 | 403 | 404 | 415 | 500, UpdateQuestionRequest>
   | DocumentedOperation<'delete-question', 'DELETE', '/api/v1/questions/{id}', never, 204, 400 | 401 | 403 | 404 | 500>
@@ -56,7 +55,7 @@ export const publicQuestionExample: PublicQuestion = {
 
 const adminQuestionExample: AdminQuestion = { ...publicQuestionExample, correctAnswer: 'Japanese yen' }
 const browserSessionExample: BrowserSessionResponse = {
-  username: 'admin', expiresIn: 900, accessExpiresIn: 300, absoluteExpiresIn: 1800,
+  username: 'admin', expiresIn: 600, accessExpiresIn: 300,
   csrfToken: 'a'.repeat(43),
 }
 const idParameter = [{
@@ -116,7 +115,7 @@ export const endpoints: ApiEndpoint[] = [
     responseBody: { accessToken: 'YOUR_ADMIN_TOKEN', tokenType: 'Bearer', expiresIn: 300 }, successStatus: 200,
     notes: [
       'Limited to 5 requests per minute per client IP. Use HTTPS outside local development.',
-      'expiresIn is the configured token lifetime in seconds (1–300). Access tokens last at most five minutes.',
+      'expiresIn is the configured access-token lifetime in seconds. The default is 300 seconds (five minutes), bounded by the original sign-in’s absolute deadline.',
       'Send the returned token as Authorization: Bearer YOUR_ADMIN_TOKEN for administration requests.',
       'Username must contain 1–100 characters and password 1–1,024 characters. Examples contain placeholders only.',
       'This bearer-token flow is for API clients. The website uses the separate HttpOnly browser-session endpoints below.',
@@ -126,15 +125,16 @@ export const endpoints: ApiEndpoint[] = [
   {
     id: 'create-session', title: 'Sign in with a cookie', label: 'Browser sign in', group: 'Administration',
     method: 'POST', path: '/api/v1/auth/session', auth: false, browserSession: 'create',
-    description: 'Start the website’s admin session without exposing an authentication token to JavaScript.',
+    description: 'Sign in with stateless JWT cookies without exposing an authentication token to JavaScript.',
     requestBody: { username: 'YOUR_ADMIN_USERNAME', password: 'YOUR_ADMIN_PASSWORD' },
     responseBody: browserSessionExample, successStatus: 200,
     notes: [
-      'The server sets HttpOnly access and refresh cookies. JSON contains username, remaining idle/access/absolute lifetimes, and a CSRF token; neither credential is exposed.',
+      'The server sets HttpOnly access and refresh JWT cookies. JSON contains only username, expiresIn, accessExpiresIn, and csrfToken; neither credential is exposed.',
       'Browsers must send credentials: include. Origin is sent automatically and must match ADMIN_CORS_ALLOWED_ORIGINS; terminal examples set it explicitly.',
       'Shares the 5 requests per minute per client IP login limit with bearer login. Use HTTPS outside local development.',
       'Use the same-origin /api proxy on Netlify. Keep the returned CSRF token in memory, then send it as X-CSRF-Token on admin writes.',
-      'Access lasts five minutes, inactivity ends the session after 15 minutes, and the absolute session limit is 30 minutes. Limits can be configured lower.',
+      'Defaults are five minutes for access, ten minutes for each refresh JWT, and 24 hours from original sign-in overall. JWT_TOKEN_TTL_SECONDS, JWT_REFRESH_TOKEN_TTL_SECONDS, and JWT_ABSOLUTE_TTL_SECONDS configure them in the backend.',
+      'Each token expires at its configured lifetime or the original absolute deadline, whichever comes first. An expired refresh JWT requires sign-in again, even before the absolute deadline.',
     ],
     responses: [{ status: 200, description: 'Session metadata plus Set-Cookie headers; no authentication token in JSON.' }, badRequest, unauthorized, forbidden, unsupportedMedia, rateLimited, internalError],
   },
@@ -144,49 +144,37 @@ export const endpoints: ApiEndpoint[] = [
     description: 'Restore admin metadata after a reload using the browser-managed cookies.',
     responseBody: browserSessionExample, successStatus: 200,
     notes: [
-      'Send the existing session cookie with credentials: include. A missing, revoked, or expired session returns 401.',
+      'Send the JWT cookies with credentials: include. Missing, invalid, or expired credentials return 401.',
       'Same-origin GET requests may omit Origin. If present, the origin must be explicitly trusted.',
       'Session responses use Cache-Control: no-store. Reading a session does not extend its expiry. The refresh cookie can restore metadata after access expires, without granting permission to change questions.',
     ],
-    responses: [{ status: 200, description: 'Username, remaining idle/access/absolute lifetimes, and the session-bound CSRF token.' }, unauthorized, forbidden, internalError],
+    responses: [{ status: 200, description: 'Username, current refresh/access lifetimes, and the JWT-bound CSRF token.' }, unauthorized, forbidden, internalError],
   },
   {
     id: 'delete-session', title: 'Sign out of the browser', label: 'Browser sign out', group: 'Administration',
     method: 'DELETE', path: '/api/v1/auth/session', auth: true, browserSession: 'delete',
-    description: 'Revoke the browser session on the server and expire both HttpOnly cookies.',
+    description: 'Expire both HttpOnly JWT cookies using their original scopes.',
     successStatus: 204,
     notes: [
       'Requires an access or current refresh cookie, a trusted Origin, and X-CSRF-Token from the most recent session response.',
-      'A successful response is 204 with no body. If the request fails, do not claim the server session has been revoked; retry sign-out.',
-      'Browser sessions are stored in memory. Restarting Render signs browser administrators out; bearer JWTs remain a separate flow.',
+      'A successful response is 204 with no body. If the request fails, keep the sign-out error visible and allow an explicit retry.',
+      'The backend stores no authentication sessions. Logout clears cookies but cannot revoke copied JWTs; they remain valid until their own expiry. Tokens survive a restart when the signing key and configuration stay the same.',
     ],
-    responses: [{ status: 204, description: 'Session revoked and both cookies expired. No response body.' }, unauthorized, forbidden, internalError],
+    responses: [{ status: 204, description: 'Both cookies expired. No response body.' }, unauthorized, forbidden, internalError],
   },
   {
-    id: 'refresh-session', title: 'Rotate the browser tokens', label: 'Refresh session', group: 'Administration',
+    id: 'refresh-session', title: 'Renew the browser tokens', label: 'Refresh session', group: 'Administration',
     method: 'POST', path: '/api/v1/auth/session/refresh', auth: true, browserSession: 'refresh',
-    description: 'Issue new access and refresh cookies without extending the idle or absolute session deadline.',
+    description: 'Issue new access and refresh JWT cookies within the original absolute sign-in deadline.',
     responseBody: browserSessionExample, successStatus: 200,
     notes: [
-      'Requires the refresh cookie, a trusted Origin, and X-CSRF-Token. Both credentials remain HttpOnly.',
-      'A refresh token is single-use. Replaying a spent token revokes the session family, including its latest access cookie.',
-      'Serialize refreshes across browser tabs with Web Locks. Do not automatically retry a timed-out refresh.',
-      'Refresh and activity requests share a limit of 30 per minute per client IP. Background refresh does not count as user activity.',
+      'Requires an unexpired refresh cookie, a trusted Origin, and X-CSRF-Token. Both replacements remain HttpOnly and preserve the CSRF nonce.',
+      'Each renewal normally gives access 300 seconds and refresh 600 seconds. Signed auth_time and absolute_exp preserve the original 24-hour deadline; with 20 seconds left, both new tokens last only 20 seconds. All three lifetimes are configurable.',
+      'Earlier JWTs remain valid until their own expiry. Replacement provides no single-use enforcement or refresh reuse detection without server-side state.',
+      'The website serializes refresh, login, and logout across tabs with Web Locks and renews only before a user-requested operation. No background timer keeps a login alive.',
+      'Refresh is limited to 30 requests per minute per client IP. Reading metadata extends no expiry; an expired refresh or absolute deadline requires a fresh sign-in.',
     ],
     responses: [{ status: 200, description: 'New access and refresh cookies plus updated session metadata.' }, unauthorized, forbidden, rateLimited, internalError],
-  },
-  {
-    id: 'session-activity', title: 'Record admin activity', label: 'Session activity', group: 'Administration',
-    method: 'POST', path: '/api/v1/auth/session/activity', auth: true, browserSession: 'activity',
-    description: 'Record user interaction and move the idle deadline, bounded by the original absolute session limit.',
-    responseBody: browserSessionExample, successStatus: 200,
-    notes: [
-      'Requires a live access cookie, trusted Origin, and X-CSRF-Token. Refresh access first if accessExpiresIn is zero.',
-      'Call only after user interaction. Polling, a visible tab, or an open editor alone must not keep a session alive.',
-      'The frontend reports trusted input events at most once per 30 seconds. The backend enforces 15 idle minutes and 30 minutes overall.',
-      'The server can verify the request and its session, but cannot independently prove a physical human action. The absolute limit still applies.',
-    ],
-    responses: [{ status: 200, description: 'Updated session metadata; the absolute deadline stays fixed.' }, unauthorized, forbidden, rateLimited, internalError],
   },
   {
     id: 'create-question', title: 'Create a question', label: 'Create a question', group: 'Administration',
@@ -309,7 +297,7 @@ export function buildShellExamples(baseUrl: string, endpoint: ApiEndpoint, quest
     powershell.unshift('# Set $env:FRONTEND_ORIGIN to an origin in ADMIN_CORS_ALLOWED_ORIGINS.', '# Keep $adminSession and $adminWebSession for the following requests.', '')
   }
   const bashIntro = endpoint.browserSession === 'create'
-    ? '# Set FRONTEND_ORIGIN to an origin in ADMIN_CORS_ALLOWED_ORIGINS.\n# Save csrfToken from the response as CSRF_TOKEN for sign-out.\n# admin-cookies.txt contains a credential; keep it private and remove it after use.\n\n'
+    ? '# Set FRONTEND_ORIGIN to an origin in ADMIN_CORS_ALLOWED_ORIGINS.\n# Save csrfToken from the response as CSRF_TOKEN for refresh and sign-out.\n# admin-cookies.txt contains credentials; keep it private and remove it after use.\n\n'
     : ''
   return { powershell: powershell.join('\n'), bash: bashIntro + bash.join(' \\\n') }
 }
